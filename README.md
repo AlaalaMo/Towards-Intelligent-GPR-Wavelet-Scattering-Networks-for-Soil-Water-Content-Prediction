@@ -38,6 +38,8 @@ Run the following commands from the repository root on a SLURM cluster. The job 
 
 2. **Generate and submit the fitting jobs.** After preprocessing finishes, set `CONFIG_FILE_LOCATION` in [Turing_aboose/smooth_sbatch.sh](Turing_aboose/smooth_sbatch.sh) to the generated JSON file, select the model and its parameter settings, and ensure the configured results directory exists. The wrapper generates SLURM job scripts that call [main_fitting.py](main_fitting.py) for the dataset configurations and selected subsets.
 
+   Set `MODEL_TYPE` to `LinearRegression` for linear regression, `Lasso` for LASSO regression, `RandomForestRegressor` for scikit-learn random forest regression, or `XGBRFRegressor` for XGBoost random forest regression. Each run fits one model type. For `XGBRFRegressor`, supply a matching parameter JSON file. The bundled `xgbregressor_params.json` is configured for boosted-tree `XGBRegressor` runs.
+
    ```bash
    sbatch Turing_aboose/smooth_sbatch.sh
    ```
