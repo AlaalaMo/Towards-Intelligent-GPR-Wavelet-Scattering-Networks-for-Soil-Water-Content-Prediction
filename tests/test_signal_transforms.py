@@ -103,17 +103,26 @@ class SignalTransformTests(TestCase):
         for combined, first, second, stride, width in cases:
             with self.subTest(stride=stride):
                 result = combined(frame, ["height_1"])
-                pd.testing.assert_frame_equal(result.iloc[:, :52], frame)
+                # Concatenation mixes integer sample labels and string feature
+                # labels in one MultiIndex level. Compare labels and values.
+                pd.testing.assert_frame_equal(
+                    result.iloc[:, :52], frame, check_column_type=False
+                )
                 for transform, prefix, start in (
                     (first, "fir", 52), (second, "sec", 52 + width)
                 ):
                     individual = transform(frame, ["height_1"])
-                    pd.testing.assert_frame_equal(individual.iloc[:, :52], frame)
+                    pd.testing.assert_frame_equal(
+                        individual.iloc[:, :52], frame, check_column_type=False
+                    )
                     features = individual.iloc[:, 52:]
                     self.assertEqual(list(features.columns),
                                      [("height_1", f"{prefix}_{stride}_{i}")
                                       for i in range(width)])
-                    pd.testing.assert_frame_equal(features, result.iloc[:, start:start + width])
+                    pd.testing.assert_frame_equal(
+                        features, result.iloc[:, start:start + width],
+                        check_column_type=False,
+                    )
                 if stride == 4:
                     np.testing.assert_array_equal(result.iloc[:, 52:65], np.full((1, 13), 4))
                     np.testing.assert_array_equal(result.iloc[:, 65:], np.zeros((1, 13)))
