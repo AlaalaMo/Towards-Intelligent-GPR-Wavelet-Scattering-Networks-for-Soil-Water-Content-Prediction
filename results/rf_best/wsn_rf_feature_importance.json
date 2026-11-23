@@ -1,0 +1,32 @@
+{
+  "who": "Vincent Filardi",
+  "what": "Per-feature RF importance over frequency",
+  "where": "Frequency-domain model evaluation",
+  "why": "Assess intrinsic model importance vs. \u0394R\u00b2 sensitivity",
+  "stats": {
+    "min": 0.15519542054462324,
+    "max": 0.661790001482998,
+    "mean": 0.3333333333333333,
+    "median": 0.18301457797237877
+  },
+  "top_features": [
+    {
+      "feature_idx": 1,
+      "f_GHz": 1.2000000000000002,
+      "rf_importance": 0.661790001482998,
+      "rf_importance_norm": 1.0
+    },
+    {
+      "feature_idx": 2,
+      "f_GHz": 2.0,
+      "rf_importance": 0.18301457797237877,
+      "rf_importance_norm": 0.05491404463155839
+    },
+    {
+      "feature_idx": 0,
+      "f_GHz": 0.4,
+      "rf_importance": 0.15519542054462324,
+      "rf_importance_norm": 0.0
+    }
+  ]
+}

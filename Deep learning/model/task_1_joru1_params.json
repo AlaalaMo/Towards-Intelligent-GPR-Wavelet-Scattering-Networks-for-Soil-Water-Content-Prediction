@@ -1,0 +1,12 @@
+{
+    "learning_rate": {
+        "min": 1e-16,
+        "max": 1e-2
+    },
+    "batch_size": {
+        "values": [2, 4, 8, 16, 32]
+    },
+    "num_epochs": {
+        "values": [10, 20, 50, 100, 200, 300, 500]
+    }
+}

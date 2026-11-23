@@ -1,0 +1,16 @@
+# Ignore generated results
+/SK_learn_models/Results_per_sk_model/
+
+# Ignore data files
+/link_data/
+
+# Ignore SLURM scripts directory
+/sh_files/
+
+# Ignore SLURM output directory
+/out_files/
+
+# Ignore files by extension (recursively)
+*.out
+*.err
+*.pkl

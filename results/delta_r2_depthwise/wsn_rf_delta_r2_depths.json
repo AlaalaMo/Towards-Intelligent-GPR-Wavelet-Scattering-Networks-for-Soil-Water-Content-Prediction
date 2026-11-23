@@ -1,0 +1,96 @@
+{
+  "who": "Vincent Filardi",
+  "what": "\u0394R\u00b2 spectral permutation per depth with sliding windows",
+  "when": "2026-02-24T09:58:16",
+  "where": "Frequency-domain model evaluation",
+  "why": "Localize frequency bands that drive SWC prediction at each depth",
+  "r2_baseline_per_depth": {
+    "10 cm": -0.22207244038952623,
+    "20 cm": 0.2682544241808291,
+    "30 cm": 0.4249751180067106,
+    "40 cm": 0.6824701590460377
+  },
+  "summary_per_depth": {
+    "10 cm": {
+      "mean_delta_r2": 1.036938857361576,
+      "median_delta_r2": 1.036938857361576,
+      "top_windows": [
+        {
+          "f_center_GHz": 1.2150943396226417,
+          "delta_r2_mean": 1.036938857361576,
+          "delta_r2_std": 0.6114842320308939,
+          "w_start": 0,
+          "w_end": 54
+        }
+      ],
+      "peak_window": {
+        "f_center_GHz": 1.2150943396226417,
+        "delta_r2_mean": 1.036938857361576,
+        "delta_r2_std": 0.6114842320308939,
+        "w_start": 0,
+        "w_end": 54
+      }
+    },
+    "20 cm": {
+      "mean_delta_r2": 1.3449402739996486,
+      "median_delta_r2": 1.3449402739996486,
+      "top_windows": [
+        {
+          "f_center_GHz": 1.2150943396226417,
+          "delta_r2_mean": 1.3449402739996486,
+          "delta_r2_std": 0.5588475326555388,
+          "w_start": 0,
+          "w_end": 54
+        }
+      ],
+      "peak_window": {
+        "f_center_GHz": 1.2150943396226417,
+        "delta_r2_mean": 1.3449402739996486,
+        "delta_r2_std": 0.5588475326555388,
+        "w_start": 0,
+        "w_end": 54
+      }
+    },
+    "30 cm": {
+      "mean_delta_r2": 1.0013999118141839,
+      "median_delta_r2": 1.0013999118141839,
+      "top_windows": [
+        {
+          "f_center_GHz": 1.2150943396226417,
+          "delta_r2_mean": 1.0013999118141839,
+          "delta_r2_std": 0.6160951686847651,
+          "w_start": 0,
+          "w_end": 54
+        }
+      ],
+      "peak_window": {
+        "f_center_GHz": 1.2150943396226417,
+        "delta_r2_mean": 1.0013999118141839,
+        "delta_r2_std": 0.6160951686847651,
+        "w_start": 0,
+        "w_end": 54
+      }
+    },
+    "40 cm": {
+      "mean_delta_r2": 1.5751754359552517,
+      "median_delta_r2": 1.5751754359552517,
+      "top_windows": [
+        {
+          "f_center_GHz": 1.2150943396226417,
+          "delta_r2_mean": 1.5751754359552517,
+          "delta_r2_std": 0.4836218432927825,
+          "w_start": 0,
+          "w_end": 54
+        }
+      ],
+      "peak_window": {
+        "f_center_GHz": 1.2150943396226417,
+        "delta_r2_mean": 1.5751754359552517,
+        "delta_r2_std": 0.4836218432927825,
+        "w_start": 0,
+        "w_end": 54
+      }
+    }
+  },
+  "interpretation": "Higher \u0394R\u00b2 indicates that scrambling the window disrupts depth-specific associations. Peaks mark bands where the model relies most on spectral structure for that depth."
+}
