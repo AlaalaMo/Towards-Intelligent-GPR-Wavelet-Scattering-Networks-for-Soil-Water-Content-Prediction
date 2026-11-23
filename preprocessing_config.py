@@ -102,7 +102,6 @@ def clean_filter_and_deduplicate_dicts(list_of_dicts):
     """
     Processes a list of dictionaries by:
     Retains the first occurrence, including wavelet entries and empty lists.
-    The historical filtering and normalization steps are commented out.
 
     Args:
         list_of_dicts (list): List of dictionaries to process.
@@ -113,16 +112,6 @@ def clean_filter_and_deduplicate_dicts(list_of_dicts):
     filtered_dicts = []
 
     for d in list_of_dicts:
-        # Check if the dictionary should be filtered out
-        # should_filter = any(
-        #     isinstance(value, list) and any('wavelet' in str(item) for item in value)
-        #     for value in d.values()
-        # )
-        # if not should_filter:
-        #     # Update empty lists to False
-        #     for key, value in d.items():
-        #         if isinstance(value, list) and not value:
-        #             d[key] = False
         filtered_dicts.append(d)
 
     # Deduplicate dictionaries
@@ -148,51 +137,6 @@ def generate_configurations() -> Tuple[List[Namespace], List[Dict[str, Any]]]:
         first-occurrence manifest records in their original order.
     """
     freq_configs = [
-        # Namespace(domain='freq_mean_sweep',
-        #           save_location='up_to_may_2023',
-        #           location_wise_transforms=['column_center_by_loc'],
-        #           height_wise_transforms=False,
-        #           location_wise_height_wise_row_wise_transforms=['row_height_trimmed_singular_values']),
-
-        # Namespace(domain='freq_mean_sweep',
-        #           save_location='up_to_may_2023',
-        #           location_wise_transforms=['column_center_by_loc'],
-        #           height_wise_transforms=False,
-        #           location_wise_height_wise_row_wise_transforms=['row_height_trimmed_singular_values',
-        #                                                          'row_height_drop_var_explained_1_and_renormalize']),
-        # Namespace(domain='freq_mean_sweep',
-        #           save_location='up_to_may_2023',
-        #           location_wise_transforms=['column_center_by_loc'],
-        #           height_wise_transforms=False,
-        #           location_wise_height_wise_row_wise_transforms=['row_height_full_singular_values']),
-        # Namespace(domain='freq_mean_sweep',
-        #           save_location='up_to_may_2023',
-        #           location_wise_transforms=['column_center_by_loc'],
-        #           height_wise_transforms=False,
-        #           location_wise_height_wise_row_wise_transforms=['row_height_full_covariance']),
-        # Namespace(domain='freq_mean_sweep',
-        #           save_location='up_to_may_2023',
-        #           location_wise_transforms=['column_center_by_loc'],
-        #           height_wise_transforms=False,
-        #           location_wise_height_wise_row_wise_transforms=['row_height_trimmed_covariance']),
-        # Namespace(domain='freq_mean_sweep',
-        #           save_location='up_to_may_2023',
-        #           location_wise_transforms=['column_center_by_loc'],
-        #           height_wise_transforms=False,
-        #           location_wise_height_wise_row_wise_transforms=['row_height_full_singular_values',
-        #                                                          'row_height_drop_var_explained_1_and_renormalize']),
-        # Namespace(domain='freq_mean_sweep',
-        #           save_location='up_to_may_2023',
-        #           location_wise_transforms=['column_center_by_loc'],
-        #           height_wise_transforms=['project_PCA_8_var'],
-        #           location_wise_height_wise_row_wise_transforms=False),
-
-        # Namespace(domain='freq_mean_sweep',
-        #           save_location='up_to_may_2023',
-        #           location_wise_transforms=['column_center_by_loc'],
-        #           height_wise_transforms=['project_PCA_8_var_exclude_first'],
-        #           location_wise_height_wise_row_wise_transforms=False),
-
         Namespace(domain='freq_mean_sweep',
                   save_location='up_to_may_2023',
                   location_wise_transforms=['column_center_by_loc'],
@@ -216,12 +160,6 @@ def generate_configurations() -> Tuple[List[Namespace], List[Dict[str, Any]]]:
         ['numerical_first_second_1_h_1_k','column_center_by_loc','column_log_transform', 'column_z_mag_transform'],
         ['p_o_wer_conversion',  'column_difference_2','column_center_by_loc','column_log_transform', 'column_z_mag_transform'],
         ['p_o_wer_conversion',  'column_difference_16','column_center_by_loc','column_log_transform', 'column_z_mag_transform'],
-        # ['p_o_wer_conversion',  'column_difference_block_2','column_center_by_loc','column_log_transform', 'column_z_mag_transform'],
-        # ['column_difference_block_2','column_center_by_loc','column_log_transform', 'column_z_mag_transform'],
-        # ['p_o_wer_conversion',  'column_difference_block_16','column_center_by_loc','column_log_transform', 'column_z_mag_transform'],
-        # ['column_difference_block_16','column_center_by_loc','column_log_transform', 'column_z_mag_transform'],
-        # ['p_o_wer_conversion', 'numerical_first_second_4_h_4_k','column_center_by_loc','column_log_transform', 'column_z_mag_transform'],
-        # ['numerical_first_second_4_h_4_k', 'column_center_by_loc', 'column_log_transform', 'column_z_mag_transform']
     ]
 
 
@@ -229,23 +167,11 @@ def generate_configurations() -> Tuple[List[Namespace], List[Dict[str, Any]]]:
 
 
     non_center_filtered_options_freq = filter_non_center_options(location_wise_transforms_options_updated)
-    # location_wise_transforms_options_singular_value = [
-    #
-    #     ['p_o_wer_conversion', 'column_difference_block_2', 'column_center_by_loc', 'column_log_transform',
-    #      'column_z_mag_transform'],
-    #     ['column_difference_block_2', 'column_center_by_loc', 'column_log_transform', 'column_z_mag_transform'],
-    #     ['p_o_wer_conversion', 'column_difference_block_16', 'column_center_by_loc', 'column_log_transform',
-    #      'column_z_mag_transform'],
-    #     ['column_difference_block_16', 'column_center_by_loc', 'column_log_transform', 'column_z_mag_transform'],
-    #
-    # ]
-
 
     all_configs = generate_variations(freq_configs, location_wise_transforms_options_updated)
     non_center_configs = generate_variations(freq_configs,non_center_filtered_options_freq)
 
     configs_as_dict = [namespace_to_dict(config) for config in (all_configs + non_center_configs)]
-    # configs_as_dict = configs_as_dict_range + configs_as_dict_freq
 
     configs_as_dict = clean_filter_and_deduplicate_dicts(configs_as_dict)
     return all_configs + non_center_configs, configs_as_dict

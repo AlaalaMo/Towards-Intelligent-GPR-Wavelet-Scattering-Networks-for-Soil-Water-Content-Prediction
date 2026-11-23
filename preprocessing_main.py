@@ -132,8 +132,6 @@ def process_configuration(args: Namespace) -> None:
     transform_names = transform_names.strip('_')  # Remove leading/trailing underscores if any
 
     output_dir = f'Final_data/{args.domain}/{args.save_location}/{abbreviate_transform_name(transform_names)}'
-    # if abbreviate_transform_name(transform_names) != "powcnfs1h1kccblcltczmtpP8vF":
-    #     return
 
 
 
@@ -214,37 +212,6 @@ def main() -> None:
     #singular value groups determined by nearest neightbor instead of sub bandwidths
     # GSVD between different locations to determine clutter
     concat_df = load_initial_dataset(configurations[0])
-
-    # level_0_cols = concat_df.columns.get_level_values(0)
-    # level_1_cols = concat_df.columns.get_level_values(1)
-    # #
-    # # # Identify the unique height-related level 0 column names
-    # height_prefixes = ('height_1', 'height_2', 'height_3')
-    # #
-    # # # Group all multi-index columns by level 0
-    # height_groups = {col: [] for col in set(level_0_cols) if col.startswith(height_prefixes)}
-    # for col, sub_col in zip(level_0_cols, level_1_cols):
-    #     if col in height_groups:
-    #         height_groups[col].append((col, sub_col))
-    # # selected_height_cols = []
-    # # for col in height_groups:
-    # #     selected_height_cols.extend(height_groups[col][::32])  # Take every other column
-    # eighth_number = 8 # 1 = first eighth, 2 = second eighth, ..., 8 = last eighth
-    #
-    # selected_height_cols = []
-    # for col in height_groups:
-    #     group_cols = height_groups[col]
-    #     n_per_eighth = max(1, int(len(group_cols) / 8))  # ensure at least 1 column per eighth
-    #
-    #     start_idx = (eighth_number - 1) * n_per_eighth
-    #     end_idx = start_idx + n_per_eighth
-    #     selected_height_cols.extend(group_cols[start_idx:min(end_idx, len(group_cols))])
-    # other_cols = [(col, sub_col) for col, sub_col in zip(level_0_cols, level_1_cols) if col not in height_groups]
-    #
-    # final_selected_cols = selected_height_cols + other_cols
-    # #
-    # # # Filter the dataframe using multi-index column selection
-    # concat_df = concat_df.loc[:, pd.MultiIndex.from_tuples(final_selected_cols)]
     concat_flag = True
 
     # Parallelizing tasks using ProcessPoolExecutor
