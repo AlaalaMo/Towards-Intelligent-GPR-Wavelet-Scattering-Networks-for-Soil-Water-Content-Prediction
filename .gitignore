@@ -3,6 +3,7 @@
 
 # Ignore data files
 /link_data/
+/Final_data/
 
 # Ignore SLURM scripts directory
 /sh_files/
