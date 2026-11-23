@@ -10,7 +10,7 @@ echo "STARTING JOB $SLURM_JOB_ID"
 
 source /home/vfilardi/miniconda3/etc/profile.d/conda.sh
 conda  activate soil_2024
-python new_data_preprocess_save_freq.py
+python preprocessing_main.py
 conda deactivate
 
 echo "ENDING JOB $SLURM_JOB_ID"
