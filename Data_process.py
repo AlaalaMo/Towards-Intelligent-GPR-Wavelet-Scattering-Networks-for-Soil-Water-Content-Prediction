@@ -7,24 +7,55 @@ from scipy.signal import savgol_filter
 
 
 def z_score_normalize_column(data):
+    """Divide each column mean by the corresponding column standard deviation.
+
+    The function subtracts the centered array from the original, yielding the
+    column means up to floating-point rounding. Zero standard deviations follow
+    NumPy division behavior.
+
+    Args:
+        data (np.ndarray): Numeric data with observations along axis 0.
+
+    Returns:
+        np.ndarray: Ratios broadcast to the shape of data.
+    """
     mean_cols = center_array_columns(data)
     std_cols = data.std(axis=0)
     return (data - mean_cols) / std_cols
 
 def center_array_columns(data):
+   """Subtract the mean along axis 0 from each observation.
+
+   Args:
+       data (np.ndarray): Numeric data with observations along axis 0.
+
+   Returns:
+       np.ndarray: Mean-centered data with the same shape as data.
+   """
    return data - data.mean(axis=0)
 
 def power_convsersion(A):
-    return np.abs(A)
-def min_max_normalize_rows(arr):
-    """
-    Perform min-max normalization over the rows of a NumPy array.
+    """Compute elementwise magnitudes.
 
-    Parameters:
-    arr (numpy.ndarray): Input array where each row will be normalized.
+    Args:
+        A (array-like): Real or complex numeric samples.
 
     Returns:
-    numpy.ndarray: Normalized array with values scaled between 0 and 1.
+        np.ndarray or scalar: Absolute values with the input shape.
+    """
+    return np.abs(A)
+def min_max_normalize_rows(arr):
+    """Scale each row by its own minimum and range.
+
+    Constant rows have zero range and produce NaNs under default NumPy
+    settings.
+
+    Args:
+        arr (np.ndarray): Two-dimensional real array shaped (rows, samples).
+
+    Returns:
+        np.ndarray: Same-shaped array with nonconstant finite rows scaled to
+            [0, 1].
     """
     row_min = arr.min(axis=1, keepdims=True)
     row_max = arr.max(axis=1, keepdims=True)
@@ -33,11 +64,14 @@ def min_max_normalize_rows(arr):
 
     return normalized
 def log_transform_complex(complex_array):
-    """
-    Apply a logarithmic transformation to the magnitudes of complex numbers.
+    """Compress complex magnitudes with log1p.
 
-    :param complex_array: Input array of complex numbers
-    :return: Log-transformed complex array
+    Args:
+        complex_array (np.ndarray): Complex samples of any shape.
+
+    Returns:
+        np.ndarray: Same-shaped complex array with log(1 + magnitude) and
+            the original phase.
     """
     amplitudes = np.abs(complex_array)
 
@@ -50,11 +84,18 @@ def log_transform_complex(complex_array):
 
 
 def z_score_normalize_complex(complex_array):
-    """
-    Apply Z-score normalization to the magnitudes of complex numbers.
+    """Standardize magnitudes and recombine them with the original phasors.
 
-    :param complex_array: Input array of complex numbers
-    :return: Z-score normalized complex array
+    Magnitude statistics use all elements. Negative standardized magnitudes
+    reverse the phasor direction. If the magnitude standard deviation is
+    exactly zero, the mean magnitude is subtracted directly from each input
+    sample.
+
+    Args:
+        complex_array (np.ndarray): Complex samples of any shape.
+
+    Returns:
+        np.ndarray: Same-shaped array of transformed samples.
     """
     amplitudes = np.abs(complex_array)
 
@@ -62,7 +103,7 @@ def z_score_normalize_complex(complex_array):
     std_amplitude = np.std(amplitudes)
 
     if std_amplitude == 0:
-        return complex_array - mean_amplitude  # If all values are the same, just subtract the mean
+        return complex_array - mean_amplitude  # Constant magnitudes make the z-score divisor zero.
 
     z_normalized_amplitudes = (amplitudes - mean_amplitude) / std_amplitude
 
@@ -72,40 +113,52 @@ def z_score_normalize_complex(complex_array):
     return z_normalized_complex_array
 
 def process_row_h(row, rounded_Num_of_Bins, rounded_Samples_per_Bin):
-    """
-    Processes a single row to compute the impulse response h(t).
-    Parameters:
-        row (array-like): A single row of complex values representing the impulse response.
-        rounded_Num_of_Bins (int): Number of bins to divide the row into.
-        rounded_Samples_per_Bin (int): Number of samples per bin.
+    """Average consecutive bins of impulse response samples.
+
+    The row must contain at least the product of the two bin counts. Trailing
+    samples beyond that product are discarded.
+
+    Args:
+        row (array-like): One-dimensional numeric samples in time order.
+        rounded_Num_of_Bins (int): Number of bins to form.
+        rounded_Samples_per_Bin (int): Number of consecutive samples per
+            bin.
+
     Returns:
-        list: Binned average impulse response values (h(t)).
+        np.ndarray: One mean sample per bin.
     """
     row = np.asarray(row)  # Ensure input is a NumPy array
     reshaped = row[:rounded_Num_of_Bins * rounded_Samples_per_Bin].reshape(rounded_Num_of_Bins, rounded_Samples_per_Bin)
     return np.mean(reshaped, axis=1)
 
 def process_row_pdp(h_row):
-    """
-    Processes a row of h(t) to compute the Power Delay Profile (PDP).
-    Parameters:
-        h_row (list): A row of impulse response values h(t).
+    """Compute a power delay profile from impulse response samples.
+
+    Args:
+        h_row (array-like): One-dimensional real or complex impulse response
+            samples.
+
     Returns:
-        list: Power Delay Profile (PDP) values for the given row.
+        np.ndarray: Squared magnitudes in the original sample order.
     """
     h_row = np.asarray(h_row)  # Ensure input is a NumPy array
     return np.abs(h_row) ** 2
 
 def compute_kth_block_column_difference(A, k = 2):
-    """
-    Compute the difference between every k-th column and its predecessor in array A.
+    """Difference adjacent columns after selecting every k-th column.
 
-    Parameters:
-    - A (np.ndarray): Input array of shape (m, n)
-    - k (int): The stride for selecting columns
+    Args:
+        A (np.ndarray): Numeric array shaped (m, n).
+        k (int): Stride for selecting columns, starting at column zero.
 
     Returns:
-    - difference (np.ndarray): Array containing the differences, shape (m, min(n//k - 1, ...))
+        np.ndarray: Later columns minus earlier columns, shaped (m, (n - 1)
+            // k).
+
+    Raises:
+        TypeError: If A is not a NumPy array.
+        ValueError: If A is not two-dimensional or k is not an integer in
+            [1, n).
     """
     if not isinstance(A, np.ndarray):
         raise TypeError("Input A must be a NumPy array.")
@@ -135,15 +188,19 @@ def compute_kth_block_column_difference(A, k = 2):
 
 
 def compute_column_difference(A, k=2):
-    """
-    Compute the difference between the (i + k)-th and i-th columns of array A.
+    """Difference all pairs of columns separated by k positions.
 
-    Parameters:
-    - A (np.ndarray): Input array of shape (m, n)
-    - k (int): The interval for difference
+    Args:
+        A (np.ndarray): Numeric array shaped (m, n).
+        k (int): Column offset between paired samples.
 
     Returns:
-    - difference (np.ndarray): Array of shape (m, n - k)
+        np.ndarray: Later columns minus earlier columns, shaped (m, n - k).
+
+    Raises:
+        TypeError: If A is not a NumPy array.
+        ValueError: If A is not two-dimensional or k is not an integer in
+            [1, n).
     """
     if not isinstance(A, np.ndarray):
         raise TypeError("Input A must be a NumPy array.")
@@ -163,19 +220,26 @@ def compute_column_difference(A, k=2):
 
 
 def compute_first_derivative_central_with_boundaries_subset(A, h=1.0, k=1):
-    """
-    Compute the first derivative of each row in array A using central differences
-    with second-order accuracy by subsetting the data with step size h.
-    Handles boundaries using forward and backward differences.
+    """Estimate each row's first derivative after striding through its columns.
 
-    Parameters:
-    - A (np.ndarray): Input array of shape (m, n)
-    - h (float): Step size between columns in the independent variable
-    - k (int): The stride for selecting columns (must be >=1)
+    Use centered differences divided by 2 * k in the interior and one-sided
+    differences divided by k at the ends. At least 2 * k selected columns are
+    needed for full boundary stencils. The scale is in selected-column units.
+    Integer arrays can truncate fractional results.
+
+    Args:
+        A (np.ndarray): Numeric array shaped (rows, samples).
+        h (int): Nonzero slice step for selecting columns. Supply an integer
+            explicitly because the default 1.0 is not a valid slice step.
+        k (int): Positive stencil offset in the selected columns.
 
     Returns:
-    - derivative_full (np.ndarray): Array containing the first derivatives,
-                                    shape (m, n_subset)
+        np.ndarray: Derivatives with the shape and dtype of A[:, ::h].
+
+    Raises:
+        TypeError: If A is not a NumPy array.
+        ValueError: If A is not two-dimensional, k is not a positive
+            integer, or k is at least the number of selected columns.
     """
     if not isinstance(A, np.ndarray):
         raise TypeError("Input A must be a NumPy array.")
@@ -206,19 +270,26 @@ def compute_first_derivative_central_with_boundaries_subset(A, h=1.0, k=1):
     return derivative_full
 
 def compute_second_derivative_central_with_boundaries_subset(A, h=1.0, k=1):
-    """
-    Compute the second derivative of each row in array A using central differences
-    with second-order accuracy by subsetting the data with step size h.
-    Handles boundaries using forward and backward differences.
+    """Estimate each row's second derivative after striding through its columns.
 
-    Parameters:
-    - A (np.ndarray): Input array of shape (m, n)
-    - h (float): Step size between columns in the independent variable
-    - k (int): The stride for selecting columns (must be >=1)
+    Use centered second differences in the interior and one-sided second
+    differences at the ends, dividing by k squared. At least 3 * k selected
+    columns are needed for full boundary stencils. The scale is in
+    selected-column units. Integer arrays can truncate fractional results.
+
+    Args:
+        A (np.ndarray): Numeric array shaped (rows, samples).
+        h (int): Nonzero slice step for selecting columns. Supply an integer
+            explicitly because the default 1.0 is not a valid slice step.
+        k (int): Positive stencil offset in the selected columns.
 
     Returns:
-    - second_derivative_full (np.ndarray): Array containing the second derivatives,
-                                           shape (m, n_subset)
+        np.ndarray: Derivatives with the shape and dtype of A[:, ::h].
+
+    Raises:
+        TypeError: If A is not a NumPy array.
+        ValueError: If A is not two-dimensional, k is not a positive
+            integer, or 2 * k is at least the number of selected columns.
     """
     if not isinstance(A, np.ndarray):
         raise TypeError("Input A must be a NumPy array.")
@@ -247,16 +318,24 @@ def compute_second_derivative_central_with_boundaries_subset(A, h=1.0, k=1):
 
     return second_derivative_full
 def savgol_moving_average_per_row(A, window_length=5, polyorder=2):
-    """
-    Apply a Savitzky-Golay filter to each row of a 2D NumPy array.
+    """Smooth each row with a Savitzky–Golay filter.
 
-    Parameters:
-    - A (np.ndarray): Input array of shape (m, n)
-    - window_length (int): Length of the filter window (must be odd and >= polyorder + 2)
-    - polyorder (int): Order of the polynomial fit
+    The filter mirrors samples at the boundaries and processes real and
+    imaginary parts separately for complex inputs.
+
+    Args:
+        A (np.ndarray): Real or complex array shaped (rows, samples).
+        window_length (int): Positive odd filter window length.
+        polyorder (int): Nonnegative polynomial degree smaller than the
+            window length.
 
     Returns:
-    - smoothed_A (np.ndarray): Smoothed array of shape (m, n)
+        np.ndarray: Smoothed samples with the same shape as A.
+
+    Raises:
+        TypeError: If A is not a NumPy array.
+        ValueError: If A is not two-dimensional or the window length or
+            polynomial degree fails the stated constraints.
     """
     if not isinstance(A, np.ndarray):
         raise TypeError("Input A must be a NumPy array.")
@@ -296,6 +375,22 @@ def savgol_moving_average_per_row(A, window_length=5, polyorder=2):
 
 
 def adjust_rows_and_columns(vector, initial_num_cols=64):
+    """Choose dimensions for packing a carrier-frequency vector.
+
+    The row count is the ceiling of the vector length divided by the width. The
+    width is resized by factors of sqrt(2), with integer truncation, to target
+    16–64 rows.
+
+    Args:
+        vector (array-like): One-dimensional carrier-frequency samples. Use
+            a length and initial width that allow a positive width and a row
+            count in the target range.
+        initial_num_cols (int): Positive starting width before the
+            adjustments.
+
+    Returns:
+        tuple[int, int]: Row count and column count before transposition.
+    """
     num_cols = initial_num_cols
     num_rows = np.ceil(len(vector) / num_cols).astype(int)
 
@@ -309,11 +404,19 @@ def adjust_rows_and_columns(vector, initial_num_cols=64):
 
     return num_rows, num_cols
 def reshape_carrier_frequency_vector(vector):
-    # will always reshape it to have between 16 and 64 number of rows, so same number of singular values
-    # only for subbandwidth problem, will not work with other vectors
-    # dont use without talking to vincent or something will go wrong
-    # goal is to alwasy makesure each sub bandwidth is its own feature and is of sufficient resolusion
-   # while at the same time, not overalping with another feature like when we do first and second derivitves same time
+    """Pack carrier-frequency samples into a matrix for sub-bandwidth features.
+
+    The function zero-pads both ends to fill the matrix, placing any extra
+    padding sample on the right.
+
+    Args:
+        vector (array-like): One-dimensional carrier-frequency samples
+            compatible with the dimension selection starting at width 64.
+
+    Returns:
+        np.ndarray: Transposed matrix shaped (num_cols, num_rows) for the
+            chosen packing dimensions.
+    """
     num_rows, num_cols = adjust_rows_and_columns(vector)
 
 
@@ -331,11 +434,19 @@ def reshape_carrier_frequency_vector(vector):
 
 
 def sub_bandwidth_compute_singular_values(matrix):
-    """
-    Compute the singular values of a normalized matrix and return the proportion of variance explained.
+    """Compute the variance fraction associated with each singular value.
 
-    :param matrix: Input matrix (numpy array, real or complex)
-    :return: Proportion of variance explained by each singular value
+    Convert to complex128, standardize each row with z_score_normalize_complex,
+    and center each column before SVD. Divide each squared singular value by
+    their sum. A zero sum produces undefined fractions.
+
+    Args:
+        matrix (array-like): Two-dimensional real or complex sub-bandwidth
+            matrix.
+
+    Returns:
+        np.ndarray: One fraction per singular value, in descending
+            singular-value order.
     """
     # Convert to complex if not already (this is a no-op if already complex)
     matrix = np.asarray(matrix, dtype=np.complex128)
@@ -352,12 +463,20 @@ def sub_bandwidth_compute_singular_values(matrix):
 
 
 def compute_lower_triangular_covariance(matrix):
-    """
-    Compute the lower triangular covariance matrix from a complex input array,
-    using the Hermitian (conjugate) transpose.
+    """Return the upper triangle of the row covariance calculation, including its
+    diagonal.
 
-    :param matrix: Input matrix (numpy array, real or complex)
-    :return: Lower triangular covariance matrix
+    Convert to complex128, standardize the rows, and center the columns.
+    Multiply the centered matrix by its conjugate transpose and divide by the
+    number of rows minus one.
+
+    Args:
+        matrix (array-like): Two-dimensional real or complex matrix with at
+            least two rows for a nonzero divisor.
+
+    Returns:
+        np.ndarray: Flat array of upper-triangle entries in NumPy
+            triangular-index order.
     """
     matrix = np.asarray(matrix, dtype=np.complex128)
 
@@ -371,7 +490,22 @@ def compute_lower_triangular_covariance(matrix):
 
     return covariance_matrix[np.triu_indices_from(covariance_matrix)]
 def row_height_full_singular_values(row, height_columns):
+    """Extract singular-value variance fractions from all rows of each reshaped
+    height signal.
 
+    Each height signal is zero-padded and reshaped using
+    reshape_carrier_frequency_vector.
+
+    Args:
+        row (pd.Series): One observation with each height selecting a
+            one-dimensional carrier-frequency signal.
+        height_columns (iterable of str): First-level height labels to
+            process, in output order.
+
+    Returns:
+        list[pd.Series]: One series per height, indexed by (height,
+            var_explained_N) with one-based feature numbering.
+    """
     height_transformed_data = []
     for col in height_columns:
         vector = row[col]
@@ -386,13 +520,21 @@ def row_height_full_singular_values(row, height_columns):
 
 
 def row_height_trimmed_singular_values(row, height_columns):
-    """
-    Custom row-wise transformation function to compute singular values for the middle 75%
-    of rows from the height columns.
+    """Extract singular-value variance fractions from the middle rows of each
+    reshaped height signal.
 
-    :param row: Pandas Series representing a row of data
-    :param height_columns: List of height columns to transform
-    :return: List of transformed height data
+    The retained rows start at int(0.125 * row_count) and stop before int(0.875
+    * row_count) in the transposed signal matrix.
+
+    Args:
+        row (pd.Series): One observation with each height selecting a
+            one-dimensional carrier-frequency signal.
+        height_columns (iterable of str): First-level height labels to
+            process, in output order.
+
+    Returns:
+        list[pd.Series]: One series per height, indexed by (height,
+            var_explained_N) with one-based feature numbering.
     """
     height_transformed_data = []
 
@@ -415,13 +557,21 @@ def row_height_trimmed_singular_values(row, height_columns):
 
 
 def row_height_full_covariance(row, height_columns):
-    """
-    Custom row-wise transformation function to compute the lower triangular covariance matrix
-    for the full data from the height columns.
+    """Extract upper-triangle covariance features from all rows of each reshaped
+    height signal.
 
-    :param row: Pandas Series representing a row of data
-    :param height_columns: List of height columns to transform
-    :return: List of transformed height data
+    Each height signal is zero-padded and reshaped using
+    reshape_carrier_frequency_vector.
+
+    Args:
+        row (pd.Series): One observation with each height selecting a
+            one-dimensional carrier-frequency signal.
+        height_columns (iterable of str): First-level height labels to
+            process, in output order.
+
+    Returns:
+        list[pd.Series]: One series per height, indexed by (height,
+            cov_elem_N) with one-based feature numbering.
     """
     height_transformed_data = []
 
@@ -439,13 +589,21 @@ def row_height_full_covariance(row, height_columns):
 
     return height_transformed_data
 def row_height_trimmed_covariance(row, height_columns):
-    """
-    Custom row-wise transformation function to compute the lower triangular covariance matrix
-    for the middle 75% of rows from the height columns.
+    """Extract upper-triangle covariance features from the middle rows of each
+    reshaped height signal.
 
-    :param row: Pandas Series representing a row of data
-    :param height_columns: List of height columns to transform
-    :return: List of transformed height data
+    The retained rows start at int(0.125 * row_count) and stop before int(0.875
+    * row_count) in the transposed signal matrix.
+
+    Args:
+        row (pd.Series): One observation with each height selecting a
+            one-dimensional carrier-frequency signal.
+        height_columns (iterable of str): First-level height labels to
+            process, in output order.
+
+    Returns:
+        list[pd.Series]: One series per height, indexed by (height,
+            cov_elem_N) with one-based feature numbering.
     """
     height_transformed_data = []
 
@@ -471,6 +629,19 @@ def row_height_trimmed_covariance(row, height_columns):
 
 
 def column_center_by_loc(group, height_columns, prefix="centered_"):
+    """Center each height sample across observations in the supplied group.
+
+    Args:
+        group (pd.DataFrame): Numeric signals with two-level columns
+            (height, sample) and one signal per row.
+        height_columns (iterable of str): First-level height labels to
+            process, in output order.
+        prefix (str): Text prepended to each second-level sample label.
+
+    Returns:
+        pd.DataFrame: Centered height columns with a fresh default row
+            index.
+    """
     transformed_data_list = []
 
     for col in height_columns:
@@ -488,6 +659,22 @@ def column_center_by_loc(group, height_columns, prefix="centered_"):
 
     return transformed_data
 def column_difference_2(group, height_columns, prefix="2diff_"):
+    """Difference all sample pairs 2 positions apart at each height.
+
+    Each selected height must have more than 2 samples. Output labels use the
+    leading original sample labels, truncated to the difference width.
+
+    Args:
+        group (pd.DataFrame): Numeric signals with two-level columns
+            (height, sample) and one signal per row.
+        height_columns (iterable of str): First-level height labels to
+            process, in output order.
+        prefix (str): Text prepended to each retained second-level sample
+            label.
+
+    Returns:
+        pd.DataFrame: Difference features with a fresh default row index.
+    """
     transformed_data_list = []
 
     for col in height_columns:
@@ -506,6 +693,22 @@ def column_difference_2(group, height_columns, prefix="2diff_"):
 
     return transformed_data
 def column_difference_16(group, height_columns, prefix="16diff_"):
+    """Difference all sample pairs 16 positions apart at each height.
+
+    Each selected height must have more than 16 samples. Output labels use the
+    leading original sample labels, truncated to the difference width.
+
+    Args:
+        group (pd.DataFrame): Numeric signals with two-level columns
+            (height, sample) and one signal per row.
+        height_columns (iterable of str): First-level height labels to
+            process, in output order.
+        prefix (str): Text prepended to each retained second-level sample
+            label.
+
+    Returns:
+        pd.DataFrame: Difference features with a fresh default row index.
+    """
     transformed_data_list = []
 
     for col in height_columns:
@@ -524,6 +727,23 @@ def column_difference_16(group, height_columns, prefix="16diff_"):
 
     return transformed_data
 def column_difference_block_2(group, height_columns, prefix="b16diff_"):
+    """Difference adjacent values after selecting every second sample at each
+    height.
+
+    Each selected height must have more than 2 samples. Output labels use the
+    leading original sample labels, truncated to the difference width.
+
+    Args:
+        group (pd.DataFrame): Numeric signals with two-level columns
+            (height, sample) and one signal per row.
+        height_columns (iterable of str): First-level height labels to
+            process, in output order.
+        prefix (str): Text prepended to each retained second-level sample
+            label.
+
+    Returns:
+        pd.DataFrame: Difference features with a fresh default row index.
+    """
     transformed_data_list = []
 
     for col in height_columns:
@@ -543,6 +763,23 @@ def column_difference_block_2(group, height_columns, prefix="b16diff_"):
     return transformed_data
 
 def column_difference_block_16(group, height_columns, prefix="b16diff_"):
+    """Difference adjacent values after selecting every sixteenth sample at each
+    height.
+
+    Each selected height must have more than 16 samples. Output labels use the
+    leading original sample labels, truncated to the difference width.
+
+    Args:
+        group (pd.DataFrame): Numeric signals with two-level columns
+            (height, sample) and one signal per row.
+        height_columns (iterable of str): First-level height labels to
+            process, in output order.
+        prefix (str): Text prepended to each retained second-level sample
+            label.
+
+    Returns:
+        pd.DataFrame: Difference features with a fresh default row index.
+    """
     transformed_data_list = []
 
     for col in height_columns:
@@ -562,6 +799,24 @@ def column_difference_block_16(group, height_columns, prefix="b16diff_"):
     return transformed_data
 
 def numerical_first_second_1_h_1_k(group,height_columns):
+    """Append first and second derivatives to each height's original samples.
+
+    Smooth each row with a five-sample, degree-two Savitzky–Golay filter before
+    differencing at unit stride and offset. Each height requires at least 3
+    samples for the stencil. Use a default row index on group for positional
+    alignment.
+
+    Args:
+        group (pd.DataFrame): Numeric signals with two-level columns
+            (height, sample) and one signal per row.
+        height_columns (iterable of str): First-level height labels to
+            process, in output order.
+
+    Returns:
+        pd.DataFrame: Original and derivative columns combined by index.
+            Derivative columns have a default row index and use fir_1_ or sec_1_
+            prefixes.
+    """
     transformed_data_list = []
     prefix = {'fir_1_':compute_first_derivative_central_with_boundaries_subset,'sec_1_':compute_second_derivative_central_with_boundaries_subset}
     for col in  height_columns:
@@ -580,6 +835,24 @@ def numerical_first_second_1_h_1_k(group,height_columns):
     transformed_data = pd.concat(transformed_data_list, axis=1)
     return transformed_data
 def numerical_first_second_4_h_4_k(group,height_columns):
+    """Append first and second derivatives to each height's original samples.
+
+    Use every fourth sample with a finite-difference offset of four in the
+    subset. The derivative labels use the leading source labels. Full boundary
+    stencils require at least 12 selected samples per height. Use a default row
+    index on group for positional alignment.
+
+    Args:
+        group (pd.DataFrame): Numeric signals with two-level columns
+            (height, sample) and one signal per row.
+        height_columns (iterable of str): First-level height labels to
+            process, in output order.
+
+    Returns:
+        pd.DataFrame: Original and derivative columns combined by index.
+            Derivative columns have a default row index and use fir_4_ or sec_4_
+            prefixes.
+    """
     transformed_data_list = []
     prefix = {'fir_4_':compute_first_derivative_central_with_boundaries_subset,'sec_4_':compute_second_derivative_central_with_boundaries_subset}
     for col in  height_columns:
@@ -599,6 +872,23 @@ def numerical_first_second_4_h_4_k(group,height_columns):
 
 
 def numerical_first_derivative_1_h_1_k(group, height_columns):
+    """Append first derivatives to each height's original samples.
+
+    Smooth each row with a five-sample, degree-two Savitzky–Golay filter before
+    differencing at unit stride and offset. Each height requires at least 2
+    samples for the stencil. Use a default row index on group for positional
+    alignment.
+
+    Args:
+        group (pd.DataFrame): Numeric signals with two-level columns
+            (height, sample) and one signal per row.
+        height_columns (iterable of str): First-level height labels to
+            process, in output order.
+
+    Returns:
+        pd.DataFrame: Original and derivative columns combined by index.
+            Derivative columns have a default row index and use fir_1_ prefixes.
+    """
     transformed_data_list = []
     for col in height_columns:
         col_columns = group.loc[:, pd.IndexSlice[col, :]]
@@ -620,6 +910,23 @@ def numerical_first_derivative_1_h_1_k(group, height_columns):
 
 
 def numerical_second_derivative_1_h_1_k(group, height_columns):
+    """Append second derivatives to each height's original samples.
+
+    Smooth each row with a five-sample, degree-two Savitzky–Golay filter before
+    differencing at unit stride and offset. Each height requires at least 3
+    samples for the stencil. Use a default row index on group for positional
+    alignment.
+
+    Args:
+        group (pd.DataFrame): Numeric signals with two-level columns
+            (height, sample) and one signal per row.
+        height_columns (iterable of str): First-level height labels to
+            process, in output order.
+
+    Returns:
+        pd.DataFrame: Original and derivative columns combined by index.
+            Derivative columns have a default row index and use sec_1_ prefixes.
+    """
     transformed_data_list = []
     for col in height_columns:
         col_columns = group.loc[:, pd.IndexSlice[col, :]]
@@ -641,6 +948,23 @@ def numerical_second_derivative_1_h_1_k(group, height_columns):
 
 
 def numerical_first_derivative_4_h_4_k(group, height_columns):
+    """Append first derivatives to each height's original samples.
+
+    Use every fourth sample with a finite-difference offset of four in the
+    subset. The derivative labels use the leading source labels. Full boundary
+    stencils require at least 8 selected samples per height. Use a default row
+    index on group for positional alignment.
+
+    Args:
+        group (pd.DataFrame): Numeric signals with two-level columns
+            (height, sample) and one signal per row.
+        height_columns (iterable of str): First-level height labels to
+            process, in output order.
+
+    Returns:
+        pd.DataFrame: Original and derivative columns combined by index.
+            Derivative columns have a default row index and use fir_4_ prefixes.
+    """
     transformed_data_list = []
     for col in height_columns:
         col_columns = group.loc[:, pd.IndexSlice[col, :]]
@@ -661,6 +985,23 @@ def numerical_first_derivative_4_h_4_k(group, height_columns):
 
 
 def numerical_second_derivative_4_h_4_k(group, height_columns):
+    """Append second derivatives to each height's original samples.
+
+    Use every fourth sample with a finite-difference offset of four in the
+    subset. The derivative labels use the leading source labels. Full boundary
+    stencils require at least 12 selected samples per height. Use a default row
+    index on group for positional alignment.
+
+    Args:
+        group (pd.DataFrame): Numeric signals with two-level columns
+            (height, sample) and one signal per row.
+        height_columns (iterable of str): First-level height labels to
+            process, in output order.
+
+    Returns:
+        pd.DataFrame: Original and derivative columns combined by index.
+            Derivative columns have a default row index and use sec_4_ prefixes.
+    """
     transformed_data_list = []
     for col in height_columns:
         col_columns = group.loc[:, pd.IndexSlice[col, :]]
@@ -681,6 +1022,18 @@ def numerical_second_derivative_4_h_4_k(group, height_columns):
 
 
 def p_o_wer_conversion(group,height_columns,prefix = 'mag_'):
+    """Extract sample magnitudes for each height.
+
+    Args:
+        group (pd.DataFrame): Numeric signals with two-level columns
+            (height, sample) and one signal per row.
+        height_columns (iterable of str): First-level height labels to
+            process, in output order.
+        prefix (str): Text prepended to each second-level sample label.
+
+    Returns:
+        pd.DataFrame: Magnitude features with a fresh default row index.
+    """
     transformed_data_list = []
 
     for col in height_columns:
@@ -699,6 +1052,19 @@ def p_o_wer_conversion(group,height_columns,prefix = 'mag_'):
     return transformed_data
 
 def column_log_transform(group,height_columns, prefix='log_i_'):
+    """Apply log1p magnitude compression to each height sample.
+
+    Args:
+        group (pd.DataFrame): Numeric signals with two-level columns
+            (height, sample) and one signal per row.
+        height_columns (iterable of str): First-level height labels to
+            process, in output order.
+        prefix (str): Text prepended to each second-level sample label.
+
+    Returns:
+        pd.DataFrame: Complex features with the original phases and a fresh
+            default row index.
+    """
     transformed_data_list = []
 
     for col in height_columns:
@@ -717,6 +1083,22 @@ def column_log_transform(group,height_columns, prefix='log_i_'):
     return transformed_data
 
 def column_z_mag_transform(group,height_columns, prefix='z_mag'):
+    """Standardize each height sample’s magnitudes across observations.
+
+    Each sample column uses z_score_normalize_complex, including its
+    zero-standard-deviation fallback.
+
+    Args:
+        group (pd.DataFrame): Numeric signals with two-level columns
+            (height, sample) and one signal per row.
+        height_columns (iterable of str): First-level height labels to
+            process, in output order.
+        prefix (str): Text prepended to each second-level sample label.
+
+    Returns:
+        pd.DataFrame: Transformed complex features with a fresh default row
+            index.
+    """
     transformed_data_list = []
 
     for col in height_columns:
@@ -735,9 +1117,29 @@ def column_z_mag_transform(group,height_columns, prefix='z_mag'):
     return transformed_data
 
 def h_t_transform(group, height_columns, bandwidth=16e8, receiption_time=109.863e-9, N=4096, Fs=30000, prefix='h(t)'):
-    """
-    Applies h(t) transformation to a group of data columns.
-    data must be in the time domain
+    """Compute binned time-domain impulse responses for each height.
+
+    Both the bin count and the samples per bin are rounded down. Rows must
+    supply enough samples to fill the bins, with at least one sample per bin
+    for finite bin means.
+
+    Args:
+        group (pd.DataFrame): Time-domain signals with two-level columns
+            (height, sample) and one signal per row.
+        height_columns (iterable of str): First-level height labels to
+            process, in output order.
+        bandwidth (float): Positive bandwidth in hertz. Its reciprocal is
+            the bin duration.
+        receiption_time (float): Reception window in seconds, long enough
+            for at least one bin.
+        N (int): Nominal sample count used to calculate samples per bin.
+        Fs (float): Sampling-frequency parameter, unused by this
+            implementation.
+        prefix (str): Stem for the second-level bin labels.
+
+    Returns:
+        pd.DataFrame: Binned features with one-based suffixes and the
+            original group index.
     """
     # Calculate bin parameters
     Bin_size = 1 / bandwidth
@@ -768,8 +1170,30 @@ def h_t_transform(group, height_columns, bandwidth=16e8, receiption_time=109.863
 
 
 def p_d_p_transform(group, height_columns, bandwidth=16e8, receiption_time=109.863e-9, N=4096, Fs=30000, prefix='pdp'):
-    """
-    Applies PDP transformation to a group of data columns.
+    """Compute binned power delay profiles for each height.
+
+    Both the bin count and the samples per bin are rounded down. Rows must
+    supply enough samples to fill the bins, with at least one sample per bin
+    for finite bin means. Each profile is the squared magnitude of the bin
+    means.
+
+    Args:
+        group (pd.DataFrame): Time-domain signals with two-level columns
+            (height, sample) and one signal per row.
+        height_columns (iterable of str): First-level height labels to
+            process, in output order.
+        bandwidth (float): Positive bandwidth in hertz. Its reciprocal is
+            the bin duration.
+        receiption_time (float): Reception window in seconds, long enough
+            for at least one bin.
+        N (int): Nominal sample count used to calculate samples per bin.
+        Fs (float): Sampling-frequency parameter, unused by this
+            implementation.
+        prefix (str): Stem for the second-level bin labels.
+
+    Returns:
+        pd.DataFrame: Binned features with zero-based suffixes and a default
+            row index.
     """
     # Calculate bin parameters
     Bin_size = 1 / bandwidth
@@ -803,6 +1227,25 @@ def p_d_p_transform(group, height_columns, bandwidth=16e8, receiption_time=109.8
     transformed_data = pd.concat(transformed_data_list, axis=1)
     return transformed_data
 def project_PCA_8_var(group, height_columns, prefix='8_pc'):
+    """Project each height onto components reaching an 80% cumulative variance
+    threshold.
+
+    Each height uses the eigenvectors of the uncentered Gram matrix X^H X,
+    sorted by descending eigenvalue. The eigenvalues are normalized by their
+    sum before selecting components. A meaningful threshold requires a positive
+    eigenvalue sum.
+
+    Args:
+        group (pd.DataFrame): Numeric signals with two-level columns
+            (height, sample) and one signal per row.
+        height_columns (iterable of str): First-level height labels to
+            process, in output order.
+        prefix (str): Stem for the second-level component labels.
+
+    Returns:
+        pd.DataFrame: Component scores with the original group index and
+            one-based component suffixes.
+    """
     transformed_data_list = []
 
     for col in height_columns:
@@ -830,6 +1273,26 @@ def project_PCA_8_var(group, height_columns, prefix='8_pc'):
     return transformed_group
 
 def project_PCA_8_var_exclude_first(group, height_columns, prefix='8_pc_ex_1'):
+    """Project each height onto leading components after dropping the dominant
+    component.
+
+    Each height uses the eigenvectors of the uncentered Gram matrix X^H X,
+    sorted by descending eigenvalue. The leading eigenpair is dropped to
+    suppress clutter. The 80% threshold is computed relative to the remaining
+    eigenvalue sum. A meaningful threshold requires a positive eigenvalue sum
+    after dropping the first component.
+
+    Args:
+        group (pd.DataFrame): Numeric signals with two-level columns
+            (height, sample) and one signal per row.
+        height_columns (iterable of str): First-level height labels to
+            process, in output order.
+        prefix (str): Stem for the second-level component labels.
+
+    Returns:
+        pd.DataFrame: Component scores with the original group index and
+            one-based component suffixes.
+    """
     transformed_data_list = []
 
     for col in height_columns:
@@ -867,12 +1330,20 @@ def project_PCA_8_var_exclude_first(group, height_columns, prefix='8_pc_ex_1'):
 
     return transformed_group
 def row_height_drop_var_explained_1_and_renormalize(row, height_columns):
-    """
-    Drop 'var_explained_1' and renormalize the remaining variance explained columns.
+    """Remove the first variance feature and rescale the remaining fractions.
 
-    :param row: Pandas Series representing a row of data
-    :param height_columns: List of height columns to process.
-    :return: List of renormalized height data without 'var_explained_1'.
+    Divide the remaining values by their sum when it is positive. Keep the
+    remaining values as supplied otherwise.
+
+    Args:
+        row (pd.Series): One observation indexed by (height, feature), with
+            numeric variance fractions.
+        height_columns (iterable of str): First-level height labels to
+            process, in output order.
+
+    Returns:
+        list[pd.Series]: One series per height with features relabeled
+            1_dropped_var_explained_N starting at N=2.
     """
     height_transformed_data = []
 
@@ -900,17 +1371,26 @@ def row_height_drop_var_explained_1_and_renormalize(row, height_columns):
 
 
 def height_wavelet_transform(group, height_columns, J=6, Q=32, max_order=2):
-    """
-    Apply a scattering wavelet transform to each column in the group,
-    extracting only second-order scattering coefficients and labeling them
-    based on their origin (real or imaginary part).
+    """Extract flattened second-order wavelet scattering features by height.
 
-    :param group: Pandas DataFrame representing the group of data.
-    :param height_columns: List of height columns to process.
-    :param J: Maximum log-scale for scattering transform.
-    :param Q: Number of wavelets per octave.
-    :param max_order: Maximum order of scattering coefficients to compute (set to 2).
-    :return: DataFrame with second-order scattering wavelet-transformed height data.
+    Min-max scale each signal row before scattering. For complex data, scale
+    and scatter the real and imaginary parts independently and place the real
+    features first. Use nonconstant rows or parts for finite scaled values.
+
+    Args:
+        group (pd.DataFrame): Numeric signals with two-level columns
+            (height, sample) and one signal per row.
+        height_columns (iterable of str): First-level height labels to
+            process, in output order.
+        J (int): Maximum log-scale passed to Scattering1D.
+        Q (int or tuple[int, int]): Wavelets per octave passed to
+            Scattering1D.
+        max_order (int): Maximum scattering order to compute. Use 2 to
+            obtain second-order features.
+
+    Returns:
+        pd.DataFrame: Second-order features with (height_column,
+            scattering_coeff) columns and a fresh default row index.
     """
     transformed_data_list = []
 
@@ -970,12 +1450,21 @@ def height_wavelet_transform(group, height_columns, J=6, Q=32, max_order=2):
 
 
 def transform_height_columns(group, transform_function):
-    """
-    Transform height columns in a group using a column-wise transformation function.
+    """Apply a callback to the height blocks and reattach other columns.
 
-    :param group: Input group (pandas DataFrame with multi-level columns)
-    :param transform_function: Custom function to apply column-wise transformations.
-    :return: Transformed group with updated height columns.
+    Height labels start with height. Non-height columns receive a fresh default
+    row index before concatenation.
+
+    Args:
+        group (pd.DataFrame): Observations with two-level columns and string
+            first-level labels.
+        transform_function (Callable): Accepts the group and sorted height
+            labels and returns a feature DataFrame. Use a default row index for
+            positional alignment.
+
+    Returns:
+        pd.DataFrame: Transformed features followed by non-height columns,
+            concatenated by row index.
     """
     first_level_columns = set(group.columns.get_level_values(0))
     height_columns = sorted([col for col in first_level_columns if col.startswith('height')])
@@ -992,12 +1481,20 @@ def transform_height_columns(group, transform_function):
 
 
 def transform_height_columns_row_wise(group, transform_function):
-    """
-    Transform height columns in a group using a row-wise transformation function.
+    """Apply a callback to each observation and reattach its non-height values.
 
-    :param group: Input group (pandas DataFrame with multi-level columns)
-    :param transform_function: Custom function to apply row-wise transformations.
-    :return: Transformed group with updated height columns.
+    Height labels start with height.
+
+    Args:
+        group (pd.DataFrame): Observations with two-level columns and string
+            first-level labels.
+        transform_function (Callable): Accepts a row Series and sorted
+            height labels. Returns a nonempty sequence of feature Series for
+            concatenation.
+
+    Returns:
+        pd.DataFrame: One transformed observation per input row, with
+            feature columns followed by original non-height columns.
     """
     first_level_columns = set(group.columns.get_level_values(0))
     height_columns = sorted([col for col in first_level_columns if col.startswith('height')])
@@ -1005,6 +1502,16 @@ def transform_height_columns_row_wise(group, transform_function):
     non_height_columns = [col for col in group.columns if col[0] not in height_columns]
 
     def transform_row(row):
+        """Build one output row from height features and the other input values.
+
+        Args:
+            row (pd.Series): One observation supplied by DataFrame.apply and
+                aligned to the enclosing group columns.
+
+        Returns:
+            pd.Series: Callback-generated height features followed by
+                non-height values.
+        """
         row_series = pd.Series(row, index=group.columns)
         non_height_part = row_series[non_height_columns]
 
@@ -1019,12 +1526,20 @@ def transform_height_columns_row_wise(group, transform_function):
 
 
 def transform_location_wise_height_row_group(df, transform_function_list):
-    """
-    Apply multiple height-wise row-wise transformation functions sequentially to the DataFrame grouped by 'meta' and 'location'.
+    """Apply row-wise height transforms within location groups.
 
-    :param df: Input DataFrame with multi-level columns.
-    :param transform_function_list: List of height-wise row-wise transformation functions to be applied sequentially.
-    :return: Transformed DataFrame.
+    Regroup by location before each callback. An empty callback list returns
+    the input frame.
+
+    Args:
+        df (pd.DataFrame): Observations with two-level columns including
+            (meta, location).
+        transform_function_list (iterable of Callable): Callbacks applied in
+            order through transform_height_columns_row_wise.
+
+    Returns:
+        pd.DataFrame: Transformed observations with the row index reset
+            after each callback.
     """
     for transform_function in transform_function_list:
         df = df.groupby(('meta', 'location')).apply(
@@ -1036,13 +1551,20 @@ def transform_location_wise_height_row_group(df, transform_function_list):
 
 
 def transform_location_wise_height_group(df, transform_function_list):
-    """
-    Apply multiple height-wise transformation functions sequentially to the DataFrame grouped by 'meta' and 'location',
-    performing column-wise transformations for each height column within each group.
+    """Apply column-wise height transforms within location groups.
 
-    :param df: Input DataFrame with multi-level columns.
-    :param transform_function_list: List of height-wise transformation functions to be applied sequentially.
-    :return: Transformed DataFrame.
+    Group by location once and run all callbacks on each group before
+    concatenation. Prints the input shape.
+
+    Args:
+        df (pd.DataFrame): Observations with two-level columns including
+            (meta, location).
+        transform_function_list (iterable of Callable): Callbacks applied in
+            order through transform_height_columns.
+
+    Returns:
+        pd.DataFrame: Transformed observations concatenated with a fresh
+            default row index.
     """
     print('shape of df',df.shape)
     grouped_df = df.groupby(('meta', 'location'))

@@ -23,8 +23,14 @@ logging.basicConfig(
 
 
 def make_json_serializable(obj):
-    """
-    Recursively convert NumPy arrays and other non-serializable objects to serializable formats.
+    """Convert supported NumPy values for JSON serialization.
+
+    Args:
+        obj: NumPy array, numeric scalar, container, or other value.
+
+    Returns:
+        Converted value. Recurses through dictionary values, lists, and
+        tuples and passes other values through.
     """
     if isinstance(obj, np.ndarray):
         return obj.tolist()
@@ -109,7 +115,30 @@ def update_results_csv(
         height_column_type: str,
         meta_location_type: str,
 ):
+    """Write a fitting result to the shared CSV while holding a file lock.
+
+    Args:
+        csv_path: Destination path, including a parent directory.
+        fieldnames: Output columns in write order.
+        config: Selected preprocessing configuration.
+        model_params: Model name, search settings, and selected parameters.
+        metrics: Train and test metrics, bootstrap path, and CV scores.
+        pca_applied: Whether PCA was applied.
+        r_pca_applied: Value to record for the reverse PCA flag.
+        height_column_type: Height subset label.
+        meta_location_type: Location subset label.
+
+    Raises:
+        LockException: The final lock acquisition attempt fails.
+        OSError: A directory or file operation fails.
+
+    Notes:
+        Backs up the destination and rewrites it via a temporary file.
+        Replaces a matching row when its test RMSE improves. Appends a
+        row when no existing row is replaced.
+    """
     def prepare_row() -> Dict[str, Any]:
+        """Build one CSV row with serialized configuration and metrics."""
         row = {
             'config': json.dumps(make_json_serializable(config), sort_keys=True),
             'model_type': model_params['model_type'],

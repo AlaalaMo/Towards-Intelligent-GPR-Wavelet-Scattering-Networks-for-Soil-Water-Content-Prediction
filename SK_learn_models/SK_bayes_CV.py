@@ -41,6 +41,19 @@ def supports_multi_output(estimator: BaseEstimator) -> bool:
 
 
 def create_optuna_param_distributions(params: Dict[str, Union[List[Any], Any]]) -> Dict[str, Any]:
+    """Convert configuration values to Optuna search distributions.
+
+    Args:
+        params: Mapping from parameter names to scalar values or lists.
+
+    Returns:
+        A distribution per parameter. Numeric values define search bounds,
+        with log scaling for selected float parameters. Other values
+        define categorical choices.
+
+    Raises:
+        ValueError: A numeric range has no values or has invalid bounds.
+    """
     optuna_params = {}
     log_scale_params = ["min_impurity_decrease", "ccp_alpha", "alpha", "tol", "eta", "gamma"]
     for param, values in params.items():
@@ -93,7 +106,7 @@ def symmetric_mean_absolute_percentage_error(y_true, y_pred):
 
 def create_cv_object(meta: pd.Series, n_splits: int = 5) -> Tuple[Union[KFold, LeaveOneGroupOut], np.ndarray]:
     """
-    Creates a cross-validation object based on the number of unique groups in meta.
+    Choose shuffled KFold for one group or LeaveOneGroupOut for several.
 
     Args:
         meta (pd.Series): Metadata for grouping.
@@ -128,7 +141,7 @@ def perform_optuna_search_grouped_cv(
         n_splits: int = 5
 ) -> Tuple[BaseEstimator, Dict[str, Any], Dict[str, np.ndarray]]:
     """
-    Performs hyperparameter optimization using Optuna with grouped cross-validation.
+    Tune an estimator on mean fold SMAPE and refit it on the supplied rows.
 
     Args:
         base_estimator (BaseEstimator): The base scikit-learn estimator.
@@ -137,11 +150,17 @@ def perform_optuna_search_grouped_cv(
         y (pd.DataFrame): Target matrix.
         meta (pd.Series): Metadata for grouping.
         n_jobs (int, optional): Number of parallel jobs. Defaults to -1.
-        n_trials (int, optional): Number of Optuna trials. Defaults to 256.
+        n_trials (int, optional): Number of Optuna trials. Defaults to 512.
         n_splits (int, optional): Number of splits for KFold. Defaults to 5.
 
     Returns:
-        Tuple[BaseEstimator, Dict[str, Any], Dict[str, np.ndarray]]: Best model, best parameters, and CV scores.
+        Fitted model, selected parameters, and a dictionary of per-fold MSE
+        scores for the selected parameters.
+
+    Notes:
+        Optuna runs up to eight trials concurrently. The trial objective
+        wraps estimators that require multi-output support. Final MSE
+        scoring and refitting use a clone of the supplied base estimator.
     """
     print("[perform_optuna_search_grouped_cv] Starting Optuna search...")
     print(f"[perform_optuna_search_grouped_cv] X type: {type(X)}, shape: {X.shape}")
@@ -189,6 +208,7 @@ def perform_optuna_search_grouped_cv(
     #     return model, model.get_params(), cv_scores
 
     def objective(trial):
+        """Sample trial parameters and return mean validation-fold SMAPE."""
         params = {}
         for name, dist in param_distributions.items():
             if isinstance(dist, optuna.distributions.CategoricalDistribution):

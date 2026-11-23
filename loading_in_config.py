@@ -8,6 +8,15 @@ import random
 from sklearn.preprocessing import StandardScaler
 
 def abbreviate_transform_name(transform_args):
+    """Build a directory label from transform initials in stage order.
+
+    Args:
+        transform_args: Mapping from stage names to transform names, lists,
+            or disabled markers.
+
+    Returns:
+        Transform initials, with F for stages marked False or "False".
+    """
     abbreviation = ''
     for key in ['location_wise_transforms', 'height_wise_transforms', 'location_wise_height_wise_row_wise_transforms']:
         value = transform_args.get(key)
@@ -26,10 +35,20 @@ def abbreviate_transform_name(transform_args):
 
 
 def get_subset_columns(df: pd.DataFrame, height_column_type: str, location_type: str) -> pd.DataFrame:
-    """
-    Subset the DataFrame to include 'y' and height columns, handling complex data efficiently.
-    Converts all complex numbers (including those stored as strings) to real and imaginary float columns.
-    Preserves the original MultiIndex structure and reports any remaining problematic values.
+    """Select locations and heights and expand complex features.
+
+    Args:
+        df: Frame with two-level column labels for metadata and features.
+        height_column_type: Exact height label or "all" for height columns.
+        location_type: Regex matched against location labels, or "all".
+
+    Returns:
+        Two-level column frame with location metadata, avg-prefixed
+        targets, and real and imaginary float64 feature columns.
+
+    Raises:
+        ValueError: A selected feature value is missing or unparseable.
+        TypeError: An expanded feature column is not float64.
     """
     if location_type.lower() == 'all':
         print('Using all locations')
@@ -56,6 +75,7 @@ def get_subset_columns(df: pd.DataFrame, height_column_type: str, location_type:
         print(f'Subsetted to height type: {height_column_type}')
 
     def parse_complex(value):
+        """Convert a numeric value or string to complex, or return None."""
         if pd.isna(value):
             return None
         if isinstance(value, complex):
@@ -79,6 +99,7 @@ def get_subset_columns(df: pd.DataFrame, height_column_type: str, location_type:
     problematic_values = {}
 
     def safe_parse_complex(value, col):
+        """Parse a feature value and record failures by column."""
         result = parse_complex(value)
         if result is None:
             if col not in problematic_values:
@@ -140,6 +161,19 @@ def get_subset_columns(df: pd.DataFrame, height_column_type: str, location_type:
 
 
 def get_transformed_data(config_file_location, config_index):
+    """Load the transformed CSV and its preprocessing configuration.
+
+    Args:
+        config_file_location: JSON file containing a configuration list.
+        config_index: Zero-based index into that list.
+
+    Returns:
+        DataFrame read with two header rows and the selected configuration.
+        The CSV path is resolved relative to the working directory.
+
+    Raises:
+        SystemExit: The index is invalid or the transformed CSV is missing.
+    """
 
     with open(config_file_location, 'r') as f:
         config_list = json.load(f)

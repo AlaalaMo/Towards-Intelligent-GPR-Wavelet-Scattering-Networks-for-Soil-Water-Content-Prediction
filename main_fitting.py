@@ -18,13 +18,21 @@ from SK_learn_models.SK_bayes_CV import perform_optuna_search_grouped_cv as perf
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import r2_score,mean_absolute_error
 def calculate_metrics(y_true, y_pred, num_features):
-    """
-    Calculate RMSE, MAPE, and Adjusted R^2 along with their standard errors.
+    """Summarize prediction errors across the supplied values.
 
-    :param y_true: True values
-    :param y_pred: Predicted values
-    :param num_features: Number of features in the model
-    :return: RMSE, MAPE, RMSE standard error, MAPE standard error, Adjusted R^2
+    Args:
+        y_true: Observed targets as an array for one or more depths.
+        y_pred: Predictions with the same shape and order as the targets.
+        num_features: Number of columns in the model's feature matrix.
+
+    Returns:
+        RMSE, percent MAPE, standard errors of the flattened absolute and
+        absolute percentage errors, and a CSV field containing the feature
+        count, pooled R², an empty entry, and mean absolute error.
+
+    Notes:
+        MAPE divides directly by observed targets. The R² calculation uses
+        the mean across all supplied target values as its baseline.
     """
     errors = y_true - y_pred
     squared_errors = errors ** 2
@@ -50,15 +58,21 @@ def calculate_metrics(y_true, y_pred, num_features):
     return rmse, mape, rmse_se, mape_se, str(num_features)+', '+ str(r2)+", "+", "+str(mean_absolute_error(y_true=y_true,y_pred=y_pred))
 
 def single_bootstrap_iteration(model, X_test, Y_test, y_columns, n_samples):
-    """
-    Perform a single bootstrap iteration.
+    """Resample test rows with replacement and score the fitted model.
 
-    :param model: Trained model
-    :param X_test: Test features (NumPy array)
-    :param Y_test: Test targets (NumPy array)
-    :param y_columns: List of target column names
-    :param n_samples: Number of samples in the test set
-    :return: overall_rmse, overall_mape, per_element_metrics
+    Args:
+        model: Fitted estimator with a multi-output predict method.
+        X_test: Test features in sample order.
+        Y_test: Test targets in the same sample order.
+        y_columns: Target names in the order of the prediction columns.
+        n_samples: Number of test rows and size of the resample.
+
+    Returns:
+        Overall RMSE, overall percent MAPE, and a dictionary of RMSE and
+        percent MAPE keyed by target name.
+
+    Notes:
+        Sampling uses the NumPy random state of the executing worker.
     """
     # Ensure inputs are NumPy arrays
     X_test = np.asarray(X_test)
@@ -88,16 +102,20 @@ def single_bootstrap_iteration(model, X_test, Y_test, y_columns, n_samples):
     return overall_rmse, overall_mape, per_element_metrics
 
 def bootstrap_test_set(model, X_test, Y_test, n_bootstraps=1000, y_columns=None, n_jobs=-1):
-    """
-    Perform bootstrapping on the test set and calculate metrics per bootstrap sample in parallel.
+    """Collect test-set bootstrap metrics from a fixed fitted model.
 
-    :param model: Trained model
-    :param X_test: Test features
-    :param Y_test: Test targets
-    :param n_bootstraps: Number of bootstrap iterations
-    :param y_columns: List of target column names
-    :param n_jobs: Number of jobs for parallel processing (-1 uses all cores)
-    :return: Dictionary containing per-bootstrap metrics
+    Args:
+        model: Fitted estimator used in every resample.
+        X_test: Test feature matrix.
+        Y_test: Aligned test target matrix.
+        n_bootstraps: Number of resamples to evaluate.
+        y_columns: Target names in matrix column order. Supply these when
+            calling this helper.
+        n_jobs: Joblib worker count. Use -1 for all available CPUs.
+
+    Returns:
+        Lists of overall RMSE and MAPE, with corresponding lists for each
+        target under the per_element key.
     """
     n_samples = X_test.shape[0]
 
@@ -125,14 +143,20 @@ def bootstrap_test_set(model, X_test, Y_test, n_bootstraps=1000, y_columns=None,
     return bootstrap_metrics
 
 def generate_unique_filename(config, height_column_type, meta_location_type, extension='pkl'):
-    """
-    Generate a unique filename based on configuration and subset columns.
+    """Build a bootstrap artifact name from the configuration and time.
 
-    :param config: Configuration dictionary
-    :param height_column_type: Type of the height column
-    :param meta_location_type: Type of the meta location
-    :param extension: File extension (default: 'pkl')
-    :return: Unique filename as a string
+    Args:
+        config: Configuration serializable as JSON.
+        height_column_type: Height subset label.
+        meta_location_type: Location subset label.
+        extension: File extension without the leading period.
+
+    Returns:
+        Filename containing both subset labels, the MD5 digest of the
+        sorted configuration JSON, and the local time to the second.
+
+    Raises:
+        TypeError: The configuration cannot be serialized as JSON.
     """
     # Convert config to a sorted JSON string to ensure consistency
     config_str = json.dumps(config, sort_keys=True)
@@ -399,25 +423,29 @@ def generate_unique_filename(config, height_column_type, meta_location_type, ext
 
 
 def load_model(model_type: str, n_jobs_mor: int = 1) -> BaseEstimator:
-    """
-    Load a machine learning model by its name. Automatically wraps models that do not
-    natively support multi-output regression with MultiOutputRegressor.
+    """Instantiate a named model from scikit-learn or XGBoost.
 
-    Parameters:
-    - model_type (str): The name of the model to load (e.g., 'RandomForestRegressor', 'Lasso', 'XGBRegressor').
-    - n_jobs_mor (int): Number of jobs for MultiOutputRegressor parallelism.
+    Args:
+        model_type: Class name to look up in the supported model modules.
+        n_jobs_mor: Retained argument for multi-output worker configuration.
+            The current loader leaves wrapping to the search code.
 
     Returns:
-    - BaseEstimator: An instance of the requested model, wrapped with MultiOutputRegressor if necessary.
+        The model instance constructed with its default parameters.
 
     Raises:
-    - ValueError: If the specified model_type is not found in sklearn or xgboost.
+        ValueError: The model cannot be found in the supported modules.
     """
     # Define models that require wrapping for multi-output regression
     # Update this set as needed when adding more models that require wrapping
     # models_requiring_wrapping = {'XGBRegressor'}
 
     def get_multioutput_regressor():
+        """Return the scikit-learn wrapper class for multi-output regression.
+
+        Raises:
+            ImportError: The module or wrapper class is unavailable.
+        """
         try:
             mo_module = importlib.import_module('sklearn.multioutput')
             MultiOutputRegressor = getattr(mo_module, 'MultiOutputRegressor')
@@ -452,6 +480,20 @@ def load_model(model_type: str, n_jobs_mor: int = 1) -> BaseEstimator:
     raise ValueError(f"Model type '{model_type}' is not supported or does not exist in sklearn or xgboost.")
 
 def main():
+    """Run the configured model fitting and evaluation from the command line.
+
+    Loads the transformed data, keeps rows with avgdepth3 at most 48, and
+    selects the requested height and location. Fits scaling and optional
+    80%-variance PCA on the selected features before splitting. Tunes and
+    refits on the training subset, then evaluates train and test predictions.
+
+    Writes a pickle of the test bootstrap metrics and updates the results
+    CSV. Uses the supplied CLI seed for NumPy and the selected splitter.
+
+    Raises:
+        ValueError: The selected data lacks exactly four target columns or
+            the requested split function name is unknown.
+    """
     parser = argparse.ArgumentParser(description='Process transformed dataset and train model.')
     parser.add_argument('--config_file', type=str, required=True, help='Path to the configuration file (JSON).')
     parser.add_argument('--config_index', type=int, required=True,
