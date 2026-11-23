@@ -51,3 +51,21 @@ Run the following commands from the repository root on a SLURM cluster. The job 
 3. **Tune and evaluate the models.** The configured split assigns 80% of the selected data to training and 20% to testing. The fitting script selects hyperparameters using cross-validation on the training partition, refits with the selected settings, and evaluates on the held-out test partition. The current fitting script uses leave-one-out cross-validation. The separate Bayesian search helper in [SK_learn_models/SK_bayes_CV.py](SK_learn_models/SK_bayes_CV.py) defaults to five-fold cross-validation for a single group and uses leave-one-group-out cross-validation for multiple groups.
 
 4. **Read the results.** Each model writes a `<ModelType>_results.csv` file in the configured results directory. The `config` column records the preprocessing configuration associated with each result.
+
+### Optional deep learning models
+
+You can also fit a Transformer, a one-dimensional convolutional neural network (CNN), or a GRU-based recurrent neural network (RNN) to predict soil water content from the GPR data. The Transformer uses attention across signal segments, the CNN learns patterns with convolutional filters, and the RNN models the sequence of signal segments with recurrent layers.
+
+From the repository root, enter `Deep learning/` and submit the baseline script for the architecture you want to fit.
+
+| Model | SLURM command |
+| --- | --- |
+| Transformer | `sbatch tf_baseline.sh` |
+| CNN | `sbatch cnn_baseline.sh` |
+| RNN | `sbatch rnn_baseline.sh` |
+
+Each script calls [initial_DL_fit.py](Deep%20learning/initial_DL_fit.py) with its model selected through `--nn_model`. The baseline scripts use the `freq_mean_sweep` dataset domain under `Final_data/`.
+
+## Results
+
+![Results table comparing soil water content prediction performance](docs/images/results.JPG)
