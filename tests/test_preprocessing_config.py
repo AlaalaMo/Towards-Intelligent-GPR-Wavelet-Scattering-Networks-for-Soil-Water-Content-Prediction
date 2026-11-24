@@ -98,3 +98,23 @@ class PreprocessingConfigTests(TestCase):
                 path, = save.call_args[0]
                 self.assertEqual(os.path.normpath(path), expected)
                 self.assertEqual(save.call_args[1], {"index": False})
+
+    def test_writer_reads_existing_two_header_csv(self) -> None:
+        """Exercise the CSV inspection branch used when rerunning a sweep."""
+        import pandas as pd
+
+        import preprocessing_main as runner
+
+        args = Namespace(domain="test", save_location="test")
+        columns = pd.MultiIndex.from_tuples(
+            [(f"height_{height}", "x") for height in (1, 2, 3)]
+        )
+        frame = pd.DataFrame([[1., 2., 3.]], columns=columns)
+        existing_csv = StringIO(frame.to_csv(index=False))
+        with patch.object(runner, "concat_df", frame), \
+             patch.object(runner.os.path, "exists", return_value=True), \
+             patch.object(runner.glob, "glob", return_value=[existing_csv]), \
+             patch.object(pd.DataFrame, "to_csv") as save, \
+             redirect_stdout(StringIO()):
+            runner.process_configuration(args)
+        save.assert_called_once()

@@ -19,12 +19,18 @@ and ensure the exact callback name is explicitly imported here.
 
 import glob
 import json
+import multiprocessing
 import os
 import re
+import sys
 from argparse import Namespace
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from copy import deepcopy
 from datetime import datetime
+
+import pandas as pd
+
+from akela_shared import csv_loader
 
 from Data_process import transform_location_wise_height_group, transform_location_wise_height_row_group
 # row wise and height wise
@@ -141,8 +147,10 @@ def process_configuration(args: Namespace) -> None:
     if concatenated_df is not None:
         print("Processing completed successfully. Resulting DataFrame shape:", concatenated_df.shape)
     else:
-        print("Processing failed due to DataFrame inconsistencies.")
-        return
+        raise RuntimeError(
+            f"Worker PID {os.getpid()} has no input DataFrame for {transform_names!r}. "
+            f"Multiprocessing start method: {multiprocessing.get_start_method()}."
+        )
     if location_wise_transforms_fucntions:
         concatenated_df = transform_location_wise_height_group(concatenated_df, location_wise_transforms_fucntions)
     if height_wise_transform_functions:
@@ -194,6 +202,9 @@ def parallel_main(arg: Namespace) -> None:
 def main() -> None:
     """Run the configured dataset preprocessing pipeline."""
     global concat_flag, concat_df
+    print(f"Working directory: {os.getcwd()}", flush=True)
+    print(f"Python: {sys.executable} ({sys.version.split()[0]})", flush=True)
+    print(f"CSV loader module: {csv_loader.__file__}", flush=True)
     configurations, configs_as_dict = generate_configurations()
     current_date = datetime.now().strftime('%Y%m%d')
 
@@ -212,22 +223,28 @@ def main() -> None:
     #singular value groups determined by nearest neightbor instead of sub bandwidths
     # GSVD between different locations to determine clutter
     concat_df = load_initial_dataset(configurations[0])
+    if concat_df is None:
+        raise RuntimeError(
+            f"No usable input DataFrame for domain {configurations[0].domain!r}. "
+            "See the CSV discovery and schema diagnostics above."
+        )
     concat_flag = True
 
     # Parallelizing tasks using ProcessPoolExecutor
+    print(f"Input shape: {concat_df.shape}. Running {len(configurations)} "
+          f"configurations using {multiprocessing.get_start_method()!r}.",
+          flush=True)
     with ProcessPoolExecutor(max_workers=8) as executor:
-        futures = [executor.submit(parallel_main, arg) for arg in configurations]
+        futures = {executor.submit(parallel_main, arg): arg for arg in configurations}
 
         for future in as_completed(futures):
             try:
                 # This will raise any exception that was raised inside parallel_main
                 future.result()
-            except MemoryError as e:
-                print(f"MemoryError encountered in task: {e}")
-                raise e  # Re-raise if you want to propagate the error further
-            except Exception as e:
-                print(f"Other exception encountered: {e}")
-                raise e  # Re-raise other exceptions as well
+            except Exception:
+                print(f"Preprocessing failed for {futures[future]!r}",
+                      file=sys.stderr, flush=True)
+                raise
 
 
 if __name__ == "__main__":

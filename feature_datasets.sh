@@ -11,7 +11,9 @@ echo "STARTING JOB $SLURM_JOB_ID"
 source /home/vfilardi/miniconda3/etc/profile.d/conda.sh
 conda  activate soil_2024 || exit 1
 source "./scripts/install_akela_shared.sh" --persistent || exit 1
-python preprocessing_main.py
+python -u preprocessing_main.py
+preprocessing_status=$?
 conda deactivate
 
-echo "ENDING JOB $SLURM_JOB_ID"
+echo "ENDING JOB $SLURM_JOB_ID (preprocessing exit status: $preprocessing_status)"
+exit "$preprocessing_status"

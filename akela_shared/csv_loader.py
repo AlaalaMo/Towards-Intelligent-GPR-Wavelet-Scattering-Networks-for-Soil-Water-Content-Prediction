@@ -3,6 +3,7 @@
 
 import glob
 import os
+import sys
 from argparse import Namespace
 from typing import List, Optional, Sequence
 
@@ -29,7 +30,14 @@ def get_csv_files(
         TypeError: The domain is missing or is not a valid path component.
     """
     target_path = os.path.join(data_folder_base, domain, process_method)
-    return glob.glob(os.path.join(target_path, '*.csv'))
+    pattern = os.path.join(target_path, '*.csv')
+    csv_files = glob.glob(pattern)
+    print(f"Matched {len(csv_files)} CSV file(s) with {os.path.abspath(pattern)}",
+          flush=True)
+    if not csv_files:
+        print(f"CSV input directory exists: {os.path.isdir(target_path)}",
+              file=sys.stderr, flush=True)
+    return csv_files
 
 
 def load_csv_files(
@@ -46,6 +54,7 @@ def load_csv_files(
     """
     dataframes = []
     for file in csv_files:
+        print(f"Loading CSV: {os.path.abspath(file)}", flush=True)
         df = load_and_process_csv(file, args)
         dataframes.append(df)
         print(f"Successfully loaded: {file}")

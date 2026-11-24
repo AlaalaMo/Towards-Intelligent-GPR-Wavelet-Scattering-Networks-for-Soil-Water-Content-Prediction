@@ -1,0 +1,23 @@
+name: soil_2024
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.9.20
+  - pip=24.2
+  - setuptools=75.1.0
+  - wheel=0.44.0
+  - numpy=2.0.2
+  - pandas=2.2.3
+  - scipy=1.13.1
+  - scikit-learn=1.5.2
+  - joblib=1.4.2
+  - py-xgboost=2.1.1=cpu*
+  - pip:
+      - kymatio==0.3.0
+      - matplotlib==3.9.4
+      - optuna==4.0.0
+      - portalocker==2.10.1
+      # Match the HPC Optuna stack and use a prebuilt Python 3.9 wheel.
+      - sqlalchemy==2.0.35
+      - greenlet==3.1.1

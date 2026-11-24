@@ -28,6 +28,30 @@ The wavelet scattering network convolves the GPR attenuation curve with Morlet w
 
 ## Running the experiments
 
+### One-time Conda setup
+
+With Conda available in Bash, run this from a fresh checkout:
+
+```bash
+bash scripts/setup_soil_2024.sh
+```
+
+This creates `soil_2024` from `environment.yml`, installs `akela-shared`
+from the checkout, and checks the preprocessing and scikit-learn fitting
+imports. Use it when creating a new environment. It leaves an existing
+environment of the same name in place. The initial setup needs access to
+Conda Forge and PyPI.
+
+The manifest pins Python and the dependencies used by preprocessing and
+scikit-learn fitting. Conda selects the platform libraries, including BLAS.
+Deep learning also requires PyTorch 2.5.1. Install
+the CPU or CUDA build appropriate for your system into `soil_2024`, then
+check GPU availability on a GPU compute node if using CUDA:
+
+```bash
+conda run -n soil_2024 python -c "import torch; print(torch.__version__, torch.version.cuda, torch.cuda.is_available())"
+```
+
 ### Shared Python package setup
 
 Feature preprocessing installs the shared package once into the active
