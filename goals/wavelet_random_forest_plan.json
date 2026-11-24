@@ -1,0 +1,123 @@
+{
+  "plan_version": 7,
+  "objective": "Package one wavelet-scattering and random-forest workflow for private training and public evaluation and prediction.",
+  "scope": {
+    "private": ["Training scans", "Training labels", "Training split membership"],
+    "release_if_authorized": ["Fitted model and preprocessing bundle", "Labeled held-out evaluation data"],
+    "research_workflow": "Implement separate entry points for the release workflow. Preserve the existing paper and SLURM paths."
+  },
+  "best_config": {
+    "config_index": 41,
+    "domain": "freq_mean_sweep",
+    "height_wise_transforms": ["height_wavelet_transform"],
+    "location_wise_height_wise_row_wise_transforms": false,
+    "location_wise_transforms": [],
+    "save_location": "up_to_may_2023"
+  },
+  "random_forest_parameters": {
+    "ccp_alpha": 0.13319440636297358,
+    "max_depth": 3,
+    "max_features": 0.2,
+    "max_leaf_nodes": 10,
+    "min_impurity_decrease": 0.00010000000000000009,
+    "min_samples_leaf": 8,
+    "min_samples_split": 10,
+    "n_estimators": 20
+  },
+  "wavelet_function_defaults": {"J": 6, "Q": 32, "max_order": 2},
+  "normalization_contract": {
+    "min_max": {
+      "implementation": "Training, evaluation, and prediction use the existing row-wise min-max normalization inside height_wavelet_transform.",
+      "bounds": "Compute each signal row's minimum and maximum at transform time, separately for the real and imaginary parts of complex signals."
+    },
+    "standard_scaler": {
+      "shared_settings": "Fit once on the training features and serialize the complete fitted scaler. Use the same fitted feature means and scales in the same feature order for training, evaluation, and prediction.",
+      "evaluation_and_prediction": "Load artifacts/standard_scaler.pkl and call transform only."
+    }
+  },
+  "target_depths_cm_in_order": [10, 20, 30, 40],
+  "paths": {
+    "test_dataset": "eval/test_dataset.csv",
+    "evaluation_metrics": "eval/metrics.json",
+    "evaluation_predictions": "eval/predictions.csv",
+    "standard_scaler": "artifacts/standard_scaler.pkl",
+    "fitted_model": "artifacts/random_forest.pkl"
+  },
+  "steps": [
+    {
+      "id": "split_and_export_test_dataset",
+      "tasks": [
+        "At the start of the workflow, reproduce the original row eligibility and train/test membership for config 41. Recover the exact split function, seed, test fraction, metadata subset and stratification columns, and input row ordering from the original run or its recorded row IDs. Account for the existing avgdepth3 <= 48 filter. Verify split membership and order by row ID before publishing any rows.",
+        "For both partitions, drop every column whose level-0 label starts with height and differs from height_2. Keep every other level-0 column, including metadata and targets, in its original order.",
+        "Save the held-out partition to eval/test_dataset.csv as raw height_2 scan inputs to config 41, after the prescribed row and column selection and before min-max normalization, wavelet scattering, or standardization. Preserve both header levels, stable row identity, metadata, and SWC labels. Verify round-trip preservation of complex signals and row order. Keep the training partition private.",
+        "Confirm whether the release set influenced configuration or hyperparameter selection. Describe it as an external or independent test set only if its provenance supports that claim."
+      ],
+      "output": "Saved height_2 evaluation dataset and a private training partition with recorded split provenance."
+    },
+    {
+      "id": "reduce_preprocessing",
+      "tasks": [
+        "Build a shared raw-scan-to-features path for config 41 only. Preserve the freq_mean_sweep input preparation and reuse height_wavelet_transform from Data_process.py with its existing defaults J=6, Q=32, and max_order=2. Preserve input frequency and feature order.",
+        "Use the wavelet function's existing min-max normalization before scattering. Compute row bounds from each input at transform time and discard them after normalization.",
+        "Validate input channels, frequency order, shape, and finite values. Check for zero-range rows and give an actionable error if they produce nonfinite features. Allow the prediction path to run on inputs without SWC labels."
+      ],
+      "output": "Shared feature pipeline and a versioned input and feature schema."
+    },
+    {
+      "id": "train_and_export",
+      "tasks": [
+        "Create a smaller private fitting entry point that uses the exact random_forest_parameters above without a hyperparameter search. Verify and record the original estimator construction and random seed separately from those supplied hyperparameters.",
+        "Keep the evaluation set out of preprocessing fitting and estimator fitting. Fit StandardScaler on the training features, then transform the training features.",
+        "Pickle the fitted StandardScaler to artifacts/standard_scaler.pkl, retaining its learned means and scales, configuration, and full fitted state. Fit the random forest on the scaled training features and four targets in depth order, then pickle the model to artifacts/random_forest.pkl. Record the transform configuration, ordered feature and output depth schemas, parameter values, code revision, dependency versions, and artifact format version.",
+        "Record that main_fitting.py currently fits the scaler before the split. Training with preprocessing fit only on the training features creates a separate release run whose metrics can differ. Obtain explicit approval before implementing the methodological change, and preserve the original research path."
+      ],
+      "output": "Versioned fitted inference bundle and run manifest."
+    },
+    {
+      "id": "evaluate_and_predict",
+      "tasks": [
+        "Create a separate evaluation script that accepts the raw evaluation CSV location as a required --eval-dataset argument, including eval/test_dataset.csv as the expected held-out input. Load the fitted artifacts. Verify the mapping from the original label columns to 10, 20, 30, and 40 cm before evaluating, and align predictions to the saved input rows and target order.",
+        "Write eval/metrics.json with overall rmse, mape, and mae, computed over all aligned row-depth pairs, and the evaluated row count. Match the existing MAPE formula and document its units and zero-target handling.",
+        "Write eval/predictions.csv with every original test row and its existing columns in saved order, then append pred_swc_10cm, pred_swc_20cm, pred_swc_30cm, and pred_swc_40cm in that order.",
+        "Provide a predict command that takes the saved bundle and compatible unlabeled scans and writes a sample identifier and SWC estimate for each configured depth.",
+        "Feed the saved raw evaluation scans and new raw prediction scans through the same config 41 preprocessing function used by training. Use the same input preparation, row-wise min-max normalization, wavelet settings, and ordered feature schema. Apply the fitted StandardScaler with transform and pass the scaled features to predict on the loaded model. Keep evaluation labels and metadata available for scoring and output.",
+        "Use the exported eligible test rows as-is so evaluation preserves the recorded split membership."
+      ],
+      "output": "Runnable evaluation and prediction commands, plus a README quickstart."
+    },
+    {
+      "id": "validate_release",
+      "tasks": [
+        "Before HPC testing, syntax-check every new or modified Python file with the repository's AKELA interpreter using python -m py_compile. Run bash -n on each new shell script in a Bash environment. Run the lightweight repository tests with python -m pytest when available and record the results.",
+        "Review the implementation against preprocessing_main.py, preprocessing_config.py, Data_process.py, loading_in_config.py, main_fitting.py, and akela_shared/splitting.py. Check config 41, input selection and split membership, wavelet defaults, normalization, feature and target order, estimator parameters and seed, and metric formulas. Document intentional differences such as fitting the scaler only on training features and report any unexplained discrepancies before the HPC run.",
+        "Compare intermediate feature arrays from the simplified and research preprocessing paths on identical representative scans using the same configuration and documented tolerances. Verify row alignment, feature order, and values.",
+        "Check that predictions agree before and after serialization, including when the bundle is loaded in a fresh process that has no training data. Verify that one scan produces equivalent features and predictions alone and in a batch for the confirmed row-local pipeline.",
+        "Check rejection of incompatible schemas, missing or misordered inputs, and nonfinite features. Exercise a small public or synthetic fixture in CI without requiring private inputs.",
+        "Evaluate the frozen release bundle on the approved held-out data. Verify the three overall scores, row-for-row correspondence between input and prediction CSV, and the four prediction columns in depth order. Verify release permissions for the dataset and fitted artifacts."
+      ],
+      "acceptance_criteria": [
+        "Documented evaluate and predict commands work from a fresh environment with the release bundle and the appropriate scan inputs.",
+        "The shared preprocessing matches the corresponding research features under the verified configuration within documented tolerances.",
+        "Pass the same raw scan through the training feature path and the evaluation path and verify agreement after min-max normalization and wavelet scattering and again after applying the saved StandardScaler. Prediction follows the same path.",
+        "Published release metrics identify the run and evaluation dataset that produced them."
+      ]
+    },
+    {
+      "id": "hpc_smoke_test",
+      "scripts": {
+        "fit": "scripts/fit_wavelet_random_forest.sh",
+        "evaluate": "scripts/evaluate_wavelet_random_forest.sh"
+      },
+      "tasks": [
+        "Add two Bash wrappers for the existing HPC environment. The fitting wrapper runs the private split, feature extraction and fixed-parameter training workflow, exports the raw held-out dataset, and saves the fitted scaler and model. The evaluation wrapper accepts the raw evaluation CSV path as a required positional argument, validates that the file is readable, and forwards the quoted path to Python as --eval-dataset.",
+        "Run both wrappers from the repository root in the cluster's configured environment using the existing SLURM workflow. Submit fitting first and wait for successful completion before submitting evaluation. Keep all HPC job submissions manual.",
+        "Check the SLURM exit statuses and logs, verify that fitting produced the raw held-out dataset and both fitted artifacts, and verify that evaluation produced finite overall RMSE, MAPE, and MAE and a prediction CSV with one output row per input row and four predictions in depth order."
+      ],
+      "example_commands": [
+        "sbatch scripts/fit_wavelet_random_forest.sh",
+        "sbatch scripts/evaluate_wavelet_random_forest.sh \"/path/to/raw_eval_dataset.csv\""
+      ],
+      "output": "HPC run logs, fitted artifacts, and evaluation outputs for the supplied raw dataset."
+    }
+  ]
+}
