@@ -1,3 +1,6 @@
+# Ignore local agent instructions
+/AGENTS.md
+
 # Ignore generated results
 /SK_learn_models/Results_per_sk_model/
 
