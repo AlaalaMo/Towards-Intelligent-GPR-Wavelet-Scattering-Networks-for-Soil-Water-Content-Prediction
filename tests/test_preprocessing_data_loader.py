@@ -1,5 +1,6 @@
 """Test input loading with temporary two-header-row CSV fixtures."""
 
+import os
 from argparse import Namespace
 from contextlib import redirect_stdout
 from io import StringIO
@@ -74,3 +75,46 @@ class PreprocessingDataLoaderTests(TestCase):
             loader.convert_x_columns_to_complex(pd.DataFrame([["invalid"]], columns=columns))
         with self.assertRaises(TypeError):
             loader.convert_x_columns_to_complex(pd.DataFrame([[1.]], columns=columns))
+
+    def test_loads_only_csvs_in_the_requested_unprocessed_domain(self) -> None:
+        """Check discovery, schema, values, and source paths together."""
+        domain = "freq_mean_sweep"
+        with TemporaryDirectory() as directory:
+            original_directory = os.getcwd()
+            os.chdir(directory)
+            try:
+                base = Path("Final_data")
+                raw = base / domain / "unprocessed"
+                expected_rows = {
+                    str(raw / "shed_b.csv"): [2 + 3j, 20],
+                    str(raw / "shed_a.csv"): [1 + 4j, 10],
+                }
+                for filename, (signal, target) in expected_rows.items():
+                    path = Path(filename)
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_text(
+                        f"x,y,y\nsample,shed_y,avgdepth5\n{signal},{target},99\n",
+                        encoding="utf-8",
+                    )
+                for path in (base / "other" / "unprocessed" / "other.csv",
+                             base / domain / "processed" / "processed.csv",
+                             raw / "notes.txt"):
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_text("unused", encoding="utf-8")
+
+                discovered = loader.get_csv_files(domain=domain)
+                self.assertCountEqual(discovered, expected_rows)
+                expected = pd.DataFrame(
+                    [expected_rows[path] + [path] for path in discovered],
+                    columns=pd.MultiIndex.from_tuples([
+                        ("height_1", f"{domain}_sample"),
+                        ("y", "shed"),
+                        ("meta", "location"),
+                    ]),
+                    index=[0] * len(discovered),
+                )
+                result = loader.load_initial_dataset(Namespace(domain=domain))
+                pd.testing.assert_frame_equal(result, expected)
+                self.assertIsNone(loader.load_initial_dataset(Namespace(domain="missing")))
+            finally:
+                os.chdir(original_directory)

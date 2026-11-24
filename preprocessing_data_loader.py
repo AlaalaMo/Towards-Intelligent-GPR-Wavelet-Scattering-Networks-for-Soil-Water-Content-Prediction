@@ -187,6 +187,35 @@ def check_and_concatenate_dataframes(
     print("Concatenation complete.")
     return concatenated_df
 
+
+class CsvInputLoader:
+    """Load raw CSVs using one preprocessing configuration.
+
+    Args:
+        args: Configuration supplying the domain for discovery and labels.
+    """
+
+    def __init__(self, args: Namespace) -> None:
+        """Store the configuration without reading any files."""
+        self._args = args
+
+    def load(self) -> Optional[pd.DataFrame]:
+        """Read and combine the configured domain's raw CSVs.
+
+        Returns:
+            Combined DataFrame in discovery order, or None for empty input
+            or incompatible schemas.
+
+        Raises:
+            OSError: An input file cannot be read.
+            ValueError: Signal conversion or CSV parsing fails.
+            TypeError: The domain is invalid or a signal dtype check fails.
+        """
+        csv_files = get_csv_files(domain=self._args.domain)
+        dataframes = load_csv_files(csv_files, self._args)
+        return check_and_concatenate_dataframes(dataframes)
+
+
 def load_initial_dataset(args: Namespace) -> Optional[pd.DataFrame]:
     """Load the input CSVs and combine them in file discovery order.
 
@@ -207,6 +236,4 @@ def load_initial_dataset(args: Namespace) -> Optional[pd.DataFrame]:
             parser rejects the input.
         TypeError: A signal column fails the complex128 dtype check.
     """
-    csv_files = get_csv_files(domain=args.domain)
-    dataframes = load_csv_files(csv_files, args)
-    return check_and_concatenate_dataframes(dataframes)
+    return CsvInputLoader(args).load()
