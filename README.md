@@ -14,7 +14,10 @@ This work investigates the development of intelligent Ground Penetrating Radar (
 
 ![Flow chart of the GPR soil water content prediction workflow](docs/images/flow_chart.png)
 
-*The workflow combines GPR signal features and moisture probe measurements to train models that estimate soil water content at multiple depths.*
+- **Data pipeline and feature engineering.** Pair ground-penetrating radar (GPR) measurements with moisture-probe labels and generate feature datasets using configurable preprocessing, including wavelet scattering.
+- **Model development.** Develop and compare scikit-learn regression models and PyTorch CNN, GRU, and Transformer models to predict soil water content (SWC) at multiple depths.
+- **Hyperparameter optimization and evaluation.** Tune regression models with cross-validation on the training split, evaluate selected models on held-out data, and compare wavelet settings and carrier-frequency subsets.
+- **Software engineering and experiment automation.** Reuse CSV loading and dataset splitting through the installable `akela_shared` Python package. Use object-oriented design for PyTorch model and dataset classes, and automate experiment runs on a SLURM cluster.
 
 ## Wavelet scattering features
 
