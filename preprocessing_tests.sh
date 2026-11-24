@@ -12,7 +12,8 @@ cd "${SLURM_SUBMIT_DIR:-$(dirname "$0")}"
 echo "STARTING TEST JOB ${SLURM_JOB_ID:-local}"
 
 source /home/vfilardi/miniconda3/etc/profile.d/conda.sh
-conda activate soil_2024
+conda activate soil_2024 || exit 1
+source "./scripts/install_akela_shared.sh" || exit 1
 
 python -B -m unittest discover -s tests -v
 

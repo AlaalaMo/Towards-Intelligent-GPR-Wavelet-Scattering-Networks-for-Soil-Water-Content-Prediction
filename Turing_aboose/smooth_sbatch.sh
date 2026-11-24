@@ -12,7 +12,7 @@ echo "STARTING JOB $SLURM_JOB_ID"
 
 # Activate Conda environment
 source /home/vfilardi/miniconda3/etc/profile.d/conda.sh
-conda activate soil_2024
+conda activate soil_2024 || exit 1
 
 # Define variables
 CONFIG_FILE_LOCATION="Final_data/freq_mean_sweep/freq_configs_20241006.json"

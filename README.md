@@ -28,6 +28,41 @@ The wavelet scattering network convolves the GPR attenuation curve with Morlet w
 
 ## Running the experiments
 
+### Shared Python package setup
+
+Feature preprocessing installs the shared package once into the active
+`soil_2024` Conda environment. The `smooth_sk_sbatch.sh` and
+`smooth_sk_sbatch_subset.sh` submission wrappers also install it once before
+their submission loops. The generation-only `smooth_sbatch.sh` wrapper and
+generated fitting jobs rely on that environment. When submitting fitting jobs
+separately, wait for feature preprocessing to finish or install the package
+manually first. Regenerate fitting scripts created with the previous version
+to remove their per-job install step.
+
+The deep learning and preprocessing test jobs still use temporary package
+installs. Automatic installation uses the local checkout and requires pip,
+setuptools 61 or newer, and wheel. The research environment should already
+provide NumPy, pandas, and scikit-learn.
+
+For interactive use on the HPC cluster, activate the same Python environment
+and run these commands from the repository root.
+
+```bash
+python -m pip install --no-deps .
+(cd 'Deep learning' && python -c "from akela_shared.csv_loader import load_csv_files; from akela_shared.splitting import stratified_train_test_split_80_20")
+```
+
+`--no-deps` keeps the existing research dependencies in place. Pip uses
+setuptools in an isolated build environment by default. If the cluster cannot
+reach the package index and the active environment already has setuptools 61
+or newer and its build requirements, use
+`python -m pip install --no-deps --no-build-isolation .`.
+Run the install again after pulling changes to `akela_shared`. The install
+contains the shared raw CSV loader and split functions. The datasets and
+experiment scripts run from the checkout as before.
+
+### Run the SLURM workflows
+
 Run the following commands from the repository root on a SLURM cluster. The job scripts use the original cluster’s Conda setup. Adapt those paths and SLURM settings for your cluster.
 
 1. **Generate the feature datasets.** Submit [feature_datasets.sh](feature_datasets.sh) to run [preprocessing_main.py](preprocessing_main.py). The configuration definitions in [preprocessing_config.py](preprocessing_config.py) select and parameterize transformations from [Data_process.py](Data_process.py). Preprocessing writes the feature datasets and a dated JSON configuration file under `Final_data/`.

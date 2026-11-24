@@ -94,7 +94,7 @@ echo "STARTING JOB $SLURM_JOB_ID"
 
 # Activate Conda environment
 source /home/vfilardi/miniconda3/etc/profile.d/conda.sh
-conda activate soil_2024
+conda activate soil_2024 || exit 1
 
 # Execute the Python script with the specified parameters
 python main_fitting.py {pca_apply}\\
@@ -116,7 +116,7 @@ echo "ENDING JOB $SLURM_JOB_ID"
 """
 
             try:
-                with open(sh_filename, 'w') as sh_file:
+                with open(sh_filename, 'w', newline='\n') as sh_file:
                     sh_file.write(sh_content)
                 print(f"Generated .sh file: {sh_filename}")
             except Exception as e:

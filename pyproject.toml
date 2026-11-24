@@ -1,0 +1,12 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "akela-shared"
+version = "0.1.0"
+description = "Shared dataset loading and splitting for the AKELA research workflows"
+dependencies = ["numpy", "pandas", "scikit-learn"]
+
+[tool.setuptools]
+packages = ["akela_shared"]

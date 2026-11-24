@@ -1,9 +1,9 @@
-from new_data_preprocess_save_range import load_csv_files, get_csv_files
+from akela_shared.csv_loader import get_csv_files, load_csv_files
+from akela_shared.splitting import stratified_train_test_split_80_20
 import pandas as pd
 import torch
 from argparse import Namespace
 import argparse
-# from SK_learn_models.test_train_split import stratified_train_test_split_80_20
 import os
 from torch.utils.data import Dataset
 import pickle

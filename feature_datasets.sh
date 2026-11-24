@@ -9,7 +9,8 @@
 echo "STARTING JOB $SLURM_JOB_ID"
 
 source /home/vfilardi/miniconda3/etc/profile.d/conda.sh
-conda  activate soil_2024
+conda  activate soil_2024 || exit 1
+source "./scripts/install_akela_shared.sh" --persistent || exit 1
 python preprocessing_main.py
 conda deactivate
 

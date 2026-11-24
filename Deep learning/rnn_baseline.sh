@@ -11,7 +11,8 @@
 ##SBATCH -C "A100|A100-80G"
 echo "STARTING JOB $SLURM_JOB_ID"
 source /home/vfilardi/miniconda3/etc/profile.d/conda.sh
-conda  activate soil_2024
+conda  activate soil_2024 || exit 1
+source "../scripts/install_akela_shared.sh" || exit 1
 python initial_DL_fit.py --train_function simple_train_model --search_space model/task_2_joru1_params.json --domain freq_mean_sweep --random_seed 42 --nn_model Stand_RNN
 echo "ENDING JOB $SLURM_JOB_ID"
 

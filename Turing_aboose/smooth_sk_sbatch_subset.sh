@@ -12,7 +12,8 @@
 echo "STARTING JOB $SLURM_JOB_ID"
 
 source /home/vfilardi/miniconda3/etc/profile.d/conda.sh
-conda activate soil_2024
+conda activate soil_2024 || exit 1
+source "./scripts/install_akela_shared.sh" --persistent || exit 1
 
 CONFIG_FILE_LOCATION="Final_data/freq_mean_sweep/freq_configs_20241015.json"
 SPLIT_FUNCTION="stratified_train_test_split_80_20"

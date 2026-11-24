@@ -29,30 +29,19 @@ from Data_process import project_PCA_8_var, project_PCA_8_var_exclude_first
 concat_flag = False
 concat_df = None
 
-def get_csv_files(data_folder_base='Final_data', domain=None, process_method='unprocessed'):
-    """Get the list of CSV files from the target path."""
-    target_path = os.path.join(data_folder_base, domain, process_method)
-    return glob.glob(os.path.join(target_path, '*.csv'))
-
-def load_csv_files(csv_files, args):
-    """Load multiple CSV files and process each DataFrame."""
-    dataframes = []
-    for file in csv_files:
-        df = load_and_process_csv(file, args)
-        dataframes.append(df)
-        print(f"Successfully loaded: {file}")
-    return dataframes
-
-def load_and_process_csv(file, args):
-    """Load a CSV file and apply all necessary processing steps."""
-    df = pd.read_csv(file, header=[0, 1])
-    df = convert_x_columns_to_complex(df)
-    confirm_x_columns_complex_and_check_nans(df)
-    df = rename_columns(df, args)
-    df = remove_unwanted_columns(df, ['avgdepth5', 'avgdepth6'])
-    df = append_meta_column(df, 'location', file)
-    print_column_dtypes(df, 'y')
-    return df
+from akela_shared.csv_loader import (
+    append_meta_column as append_meta_column,
+    confirm_x_columns_complex_and_check_nans as confirm_x_columns_complex_and_check_nans,
+    convert_x_columns_to_complex as convert_x_columns_to_complex,
+    get_csv_files as get_csv_files,
+    load_and_process_csv as load_and_process_csv,
+    load_csv_files as load_csv_files,
+    print_column_dtypes as print_column_dtypes,
+    remove_unwanted_columns as remove_unwanted_columns,
+    rename_columns as rename_columns,
+    rename_shed_y as rename_shed_y,
+    rename_x_columns_based_on_height as rename_x_columns_based_on_height,
+)
 
 
 def check_height_column_types(df):
@@ -88,82 +77,6 @@ def check_height_column_types(df):
                 print(f"Two different types found in '{col}', types: {unique_types}")
     if height_check !=3:
         raise ValueError(f"Error: Incorrect number of height columns.")
-
-def convert_x_columns_to_complex(df):
-    """Convert all columns with 'x' in the first level of the multi-index to complex numbers."""
-    x_columns = df.columns.get_level_values(0) == 'x'
-    for col in df.columns[x_columns]:
-        df[col] = df[col].apply(lambda x: complex(x.replace(' ', '')) if isinstance(x, str) else x)
-    if not all(df['x'].dtypes == np.complex128):
-        raise TypeError("Not all columns in the DataFrame are of dtype complex128.")
-    return df
-def confirm_x_columns_complex_and_check_nans(df):
-    x_columns = df.columns.get_level_values(0) == 'x'
-
-    all_complex = True
-
-    for col in df.columns[x_columns]:
-        if not pd.api.types.is_complex_dtype(df[col]):
-            print(f"Warning: Column {col} is not of complex dtype. Current dtype: {df[col].dtype}")
-            all_complex = False
-
-        if df[col].isnull().any():
-            nan_count = df[col].isnull().sum()
-            print(f"Note: Column {col} contains {nan_count} NaN values.")
-
-    if all_complex:
-        print("All 'x' level columns are confirmed to be of complex type.")
-    else:
-        print("Some 'x' level columns are not of complex type.")
-
-    return all_complex
-def rename_columns(df, args):
-    """Rename columns in the DataFrame."""
-    df = rename_shed_y(df)
-    df = rename_x_columns_based_on_height(df, args)
-    return df
-
-def rename_shed_y(df):
-    """Rename 'shed_y' to 'shed' in the second level of the MultiIndex columns."""
-    if 'shed_y' in df.columns.get_level_values(1):
-        df = df.rename(columns={'shed_y': 'shed'}, level=1)
-        print("Renamed 'shed_y' to 'shed'")
-    return df
-
-def rename_x_columns_based_on_height(df, args):
-    """Rename the first level 'x' columns based on heights."""
-    new_column_names = []
-    for col in df.columns:
-        if col[0] == 'x':
-            height_num = (df.columns.get_loc(col) // 4096) + 1
-            new_col = (f'height_{height_num}', f'{args.domain}_{col[1]}') + col[2:]
-        else:
-            new_col = col
-        new_column_names.append(new_col)
-    df.columns = pd.MultiIndex.from_tuples(new_column_names, names=df.columns.names)
-    return df
-
-def remove_unwanted_columns(df, columns_to_remove):
-    """Remove specific columns from the 'y' level of the DataFrame if they exist."""
-    columns_to_drop = [('y', col) for col in columns_to_remove if col in df['y'].columns]
-    if columns_to_drop:
-        df = df.drop(columns=columns_to_drop)
-        print(f"Dropped columns: {columns_to_drop}")
-    return df
-
-def append_meta_column(df, column_name, file_name):
-    """Append a new column with the first index 'meta' and the second index as the file name."""
-    df[('meta', column_name)] = file_name
-    print(f"Appended meta column with file name: {file_name}")
-    return df
-
-def print_column_dtypes(df, level):
-    """Print the dtypes of all columns for a specific level."""
-    if level in df.columns.get_level_values(0):
-        print(f"Data types of '{level}' index columns:")
-        print(df[level].dtypes)
-    else:
-        print(f"No columns with '{level}' in the first level index.")
 
 def check_and_concatenate_dataframes(df_list):
     """Check MultiIndex column types and concatenate DataFrames if they match."""
