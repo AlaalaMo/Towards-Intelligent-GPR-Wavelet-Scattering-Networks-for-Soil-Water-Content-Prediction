@@ -5,7 +5,6 @@ import hashlib
 import json
 import pickle
 import platform
-import subprocess
 from importlib.metadata import version
 from pathlib import Path
 from uuid import uuid4
@@ -77,9 +76,6 @@ def main():
     split = partition_scans(load_private_scans(sources), **options)
     scaler, model, feature_columns = fit_bundle(split, estimator_seed)
     source_root = Path(__file__).resolve().parent
-    revision = subprocess.check_output(
-        ["git", "-C", str(source_root), "rev-parse", "HEAD"], text=True
-    ).strip()
     source_files = (
         "fit_wavelet_random_forest.py",
         "wavelet_rf_features.py",
@@ -106,7 +102,6 @@ def main():
         "estimator_parameters": model.get_params(),
         "release_numpy_seed": estimator_seed,
         "split_strategy": options,
-        "code_revision": revision,
         "source_sha256": {
             name: hashlib.sha256((source_root / name).read_bytes()).hexdigest()
             for name in source_files

@@ -2,6 +2,7 @@
 
 import csv
 import json
+import os
 import pickle
 import subprocess
 import sys
@@ -122,14 +123,14 @@ def test_release_commands_in_fresh_processes(tmp_path):
             signal = scan[:, 0] + 1j * scan[:, 1]
             writer.writerow([*signal, *(10 + i + depth for depth in range(4))])
 
-    def run(script, *args, cwd=tmp_path):
+    def run(script, *args, cwd=tmp_path, env=None):
         result = subprocess.run(
             [sys.executable, "-B", str(repo / script), *map(str, args)],
-            cwd=cwd, capture_output=True, text=True,
+            cwd=cwd, env=env, capture_output=True, text=True,
         )
         assert result.returncode == 0, result.stderr
 
-    run("fit_wavelet_random_forest.py")
+    run("fit_wavelet_random_forest.py", env={**os.environ, "PATH": ""})
     raw.unlink()
     run("evaluate_wavelet_random_forest.py", "--artifact-dir", bundle,
         "--eval-dataset", held_out, "--output-dir", evaluation)
@@ -155,6 +156,8 @@ def test_release_commands_in_fresh_processes(tmp_path):
     metrics = json.loads((evaluation / "metrics.json").read_text(encoding="utf-8"))
     manifest = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))
     assert metrics["run_id"] == manifest["run_id"]
+    assert "code_revision" not in manifest
+    assert "fit_wavelet_random_forest.py" in manifest["source_sha256"]
     assert manifest["standard_scaler_fit_scope"] == "training_rows_only"
     assert manifest["split_strategy"]["split_function"] == "stratified_train_test_split_80_20"
     scaler = pickle.loads((bundle / "standard_scaler.pkl").read_bytes())
