@@ -84,7 +84,10 @@ def test_verified_split_and_fitted_bundle_preserve_row_order():
     assert list(split.test.columns) == list(scans.columns[:-1])
 
     scaler, model, columns = fit_bundle(split, estimator_seed=42)
-    assert scaler.n_samples_seen_ == len(split.eligible)
+    training_features = extract_features(split.train).to_numpy()
+    assert scaler.n_samples_seen_ == len(split.train)
+    np.testing.assert_allclose(scaler.mean_, training_features.mean(axis=0))
+    np.testing.assert_allclose(scaler.var_, training_features.var(axis=0))
     assert all(model.get_params()[key] == value for key, value in FOREST_PARAMETERS.items())
     assert model.random_state is None
     test_features = extract_features(split.test)
@@ -165,6 +168,9 @@ def test_release_commands_in_fresh_processes(tmp_path):
     metrics = json.loads((evaluation / "metrics.json").read_text(encoding="utf-8"))
     manifest = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))
     assert metrics["run_id"] == manifest["run_id"]
+    assert manifest["standard_scaler_fit_scope"] == "training_rows_only"
+    scaler = pickle.loads((bundle / "standard_scaler.pkl").read_bytes())
+    assert scaler.n_samples_seen_ == 8
     assert metrics["evaluation_dataset_sha256"] == dataset_hash
     assert metrics["matches_exported_held_out_dataset"]
     assert metrics["evaluated_row_count"] == 2

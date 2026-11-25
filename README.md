@@ -140,4 +140,4 @@ sbatch scripts/fit_wavelet_random_forest.sh /path/to/private-run.json
 sbatch scripts/evaluate_wavelet_random_forest.sh "$PWD/eval/test_dataset.csv"
 ```
 
-The fitting command verifies the ordered partition IDs before exporting the raw held-out rows. The fitted scaler uses all eligible feature rows, including held-out inputs, as directed for this release. The forest uses only the verified training partition. The two fitted artifacts and evaluation CSV require release authorization. The held-out set's role in configuration selection is pending provenance verification.
+The fitting command verifies the ordered partition IDs before exporting the raw held-out rows. The scaler learns feature means and scales from the verified training partition, and the forest fits on those scaled training features. Evaluation and prediction reuse the saved scaler via `transform`. Refit the scaler and forest together if you have a bundle from the earlier pre-split method. The two fitted artifacts and evaluation CSV require release authorization. The held-out set's role in configuration selection is pending provenance verification.

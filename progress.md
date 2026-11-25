@@ -24,13 +24,15 @@ Re-read `goals/wavelet_random_forest_plan.json` and apply the user's latest inst
 
 - Added `wavelet_rf_features.py` and `tests/test_wavelet_rf_features.py`. The extractor calls the original scattering function and reproduces the real and imaginary feature interleaving in the research fitter, including the zero imaginary component of each real scattering coefficient. Two synthetic tests passed with the AKELA interpreter. They cover research feature ordering, single-row versus batch parity, and rejection of incomplete, reordered, constant or nonfinite scans.
 - Compared ordered features from two representative local scans with `height_wavelet_transform` followed by the research loader's `get_subset_columns`. Both arrays matched with relative tolerance `1e-12` and absolute tolerance `1e-14`. No raw values or private row IDs were exported by this check.
-- Added `fit_wavelet_random_forest.py`. It takes a private record with explicit source labels, splitter settings, ordered IDs and release seed. The scaler fits on the full eligible matrix in research row order before indexing the training rows. The release refit seeds NumPy directly before the fixed-parameter fit. This creates a reproducible refit and does not reproduce global RNG consumption by the original search.
+- Added `fit_wavelet_random_forest.py`. It takes a private record with explicit source labels, splitter settings, ordered IDs and release seed. The release refit seeds NumPy directly before the fixed-parameter fit. This creates a reproducible refit and does not reproduce global RNG consumption by the original search.
 - Added `evaluate_wavelet_random_forest.py` and `predict_wavelet_random_forest.py`. Both validate and apply the shared feature schema and the fitted scaler. Evaluation preserves original cells and depth order and identifies the bundle run and input by hash. Its percent MAPE rejects zero and nonfinite labels.
 - Added the README quickstart, default artifact and evaluation ignores, and the two Bash wrappers for manual SLURM submission. A synthetic CLI run passed from raw research-format CSV through verified split, fit, fresh-process evaluation and prediction. The private fixture was removed before inference. The check compared all original output cells and row IDs, the four depth estimates and the three pooled metrics.
 
 ## Methodology decision
 
-The user directed that the release run fit the StandardScaler before splitting, as the research workflow does. This supersedes the training-only fit in version 7. The scaler will therefore see all eligible rows selected for the run, including held-out inputs. The estimator will be fit on the training partition. Release documentation and metrics provenance should identify this preprocessing method. A future training-only fit and model retraining would be a separate run.
+The user approved training-only StandardScaler fitting for the release workflow. The scaler fits on verified training features and is saved with its learned means and scales. Evaluation and prediction call `transform` on the saved scaler. The earlier prototype fit the scaler before splitting, as the research workflow does. The new release manifest identifies the fitting scope as `training_rows_only`.
+
+All four config 41 tests passed after the change. The regression compares the scaler's fitted means and variances with the training features and checks the serialized scaler's sample count in the fresh-process CLI test.
 
 ## Baseline checks
 

@@ -22,7 +22,7 @@ from wavelet_rf_features import (
     WAVELET_SETTINGS,
     extract_features,
 )
-from wavelet_rf_split import ROW_ID, export_evaluation_scans, load_private_scans, verified_partitions
+from wavelet_rf_split import export_evaluation_scans, load_private_scans, verified_partitions
 
 
 FOREST_PARAMETERS = {
@@ -38,14 +38,10 @@ FOREST_PARAMETERS = {
 
 
 def fit_bundle(split, estimator_seed):
-    """Fit a scaler on the full eligible feature matrix and a forest on train rows."""
-    eligible = split.eligible.set_index(ROW_ID, drop=False)
-    features = extract_features(eligible)
+    """Fit the scaler and forest on the verified training rows."""
+    features = extract_features(split.train)
     scaler = StandardScaler()
     scaled = scaler.fit_transform(features.to_numpy())
-    train_positions = eligible.index.get_indexer(split.train[ROW_ID])
-    if (train_positions < 0).any():
-        raise ValueError("Verified training IDs must occur in the eligible feature rows.")
     targets = split.train.loc[:, list(TARGET_COLUMNS)].to_numpy(dtype=np.float64)
     if not np.isfinite(targets).all():
         raise ValueError("The training targets contain nonfinite values.")
@@ -55,7 +51,7 @@ def fit_bundle(split, estimator_seed):
     prior_state = np.random.get_state()
     try:
         np.random.seed(estimator_seed)
-        model.fit(scaled[train_positions], targets)
+        model.fit(scaled, targets)
     finally:
         np.random.set_state(prior_state)
     return scaler, model, features.columns
@@ -100,7 +96,7 @@ def main():
         "domain": "freq_mean_sweep",
         "wavelet_transform": "height_wavelet_transform",
         "wavelet_settings": WAVELET_SETTINGS,
-        "standard_scaler_fit_scope": "all_eligible_rows_before_split",
+        "standard_scaler_fit_scope": "training_rows_only",
         "scan_columns": SCAN_COLUMNS,
         "feature_columns": list(feature_columns),
         "depths_cm": DEPTHS_CM,
