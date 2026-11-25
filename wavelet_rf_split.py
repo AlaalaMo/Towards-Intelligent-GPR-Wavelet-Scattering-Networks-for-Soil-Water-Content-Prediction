@@ -1,4 +1,4 @@
-"""Verify config 41 split membership before selecting release scan columns."""
+"""Split config 41 scans and select release scan columns."""
 
 import csv
 from argparse import Namespace
@@ -20,14 +20,14 @@ LOCATION = ("meta", "location")
 ELIGIBILITY_TARGET = ("y", "avgdepth3")
 
 
-class VerifiedSplit(NamedTuple):
+class ScanSplit(NamedTuple):
     eligible: pd.DataFrame
     train: pd.DataFrame
     test: pd.DataFrame
 
 
 def load_private_scans(sources):
-    """Load original input files in recorded order.
+    """Load input files in source discovery order.
 
     Each source pairs a current input path with the original research
     location label. Row IDs combine that label with the zero-based data
@@ -50,7 +50,7 @@ def load_private_scans(sources):
     return scans
 
 
-def verified_partitions(
+def partition_scans(
     scans,
     *,
     location,
@@ -58,15 +58,8 @@ def verified_partitions(
     test_size,
     random_seed,
     stratification_columns,
-    expected_train_ids,
-    expected_test_ids,
 ):
-    """Select raw partitions and require an exact ordered match to run evidence.
-
-    Scans must already have research input column names and stable row IDs.
-    Supply the original run settings and the ordered IDs from its private
-    split evidence.
-    """
+    """Select raw partitions from scans with research column names and stable row IDs."""
     if not isinstance(scans.columns, pd.MultiIndex) or scans.columns.nlevels != 2:
         raise ValueError("Expected a two-level scan header.")
     if scans.columns.has_duplicates:
@@ -102,19 +95,12 @@ def verified_partitions(
     else:
         raise ValueError(f"Unsupported research split function: {split_function}")
 
-    for name, actual, expected in (
-        ("training", train, expected_train_ids),
-        ("held-out", test, expected_test_ids),
-    ):
-        if actual.tolist() != list(expected):
-            raise ValueError(f"The {name} row IDs or ordering differ from the original run.")
-
     levels = eligible.columns.get_level_values(0)
     if HEIGHT not in levels:
         raise ValueError(f"Missing required {HEIGHT} scan columns.")
     keep = ~levels.str.startswith("height") | (levels == HEIGHT)
     selected = eligible.loc[:, keep].set_index(ROW_ID, drop=False)
-    return VerifiedSplit(
+    return ScanSplit(
         selected.reset_index(drop=True),
         selected.loc[train.tolist()].reset_index(drop=True),
         selected.loc[test.tolist()].reset_index(drop=True),

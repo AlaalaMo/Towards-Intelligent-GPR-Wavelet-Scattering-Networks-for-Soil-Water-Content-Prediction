@@ -1,4 +1,4 @@
-"""Fit and export a config 41 release bundle from private run provenance."""
+"""Fit and export a config 41 release bundle using the research split."""
 
 import argparse
 import hashlib
@@ -22,7 +22,8 @@ from wavelet_rf_features import (
     WAVELET_SETTINGS,
     extract_features,
 )
-from wavelet_rf_split import export_evaluation_scans, load_private_scans, verified_partitions
+from akela_shared.csv_loader import get_csv_files
+from wavelet_rf_split import LOCATION, export_evaluation_scans, load_private_scans, partition_scans
 
 
 FOREST_PARAMETERS = {
@@ -38,7 +39,7 @@ FOREST_PARAMETERS = {
 
 
 def fit_bundle(split, estimator_seed):
-    """Fit the scaler and forest on the verified training rows."""
+    """Fit the scaler and forest on the training rows."""
     features = extract_features(split.train)
     scaler = StandardScaler()
     scaled = scaler.fit_transform(features.to_numpy())
@@ -59,26 +60,26 @@ def fit_bundle(split, estimator_seed):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--private-run", required=True, type=Path)
     parser.add_argument("--artifact-dir", default=Path("artifacts"), type=Path)
     parser.add_argument("--eval-output", default=Path("eval/test_dataset.csv"), type=Path)
     args = parser.parse_args()
-    record = json.loads(args.private_run.read_text(encoding="utf-8"))
-    estimator_seed = record["estimator_seed"]
-    if type(estimator_seed) is not int or not 0 <= estimator_seed < 2**32:
-        parser.error("The private run record must specify a numeric estimator_seed.")
-    sources = [
-        (str(args.private_run.parent / source["path"]), source["original_location"])
-        for source in record["sources"]
-    ]
-    options = record["split"].copy()
-    options["stratification_columns"] = [
-        tuple(column) for column in options["stratification_columns"]
-    ]
-    split = verified_partitions(load_private_scans(sources), **options)
+    sources = [(path, path) for path in get_csv_files(domain="freq_mean_sweep")]
+    if not sources:
+        parser.error("No CSVs found under Final_data/freq_mean_sweep/unprocessed.")
+    estimator_seed = 42
+    options = {
+        "location": "all",
+        "split_function": "stratified_train_test_split_80_20",
+        "test_size": 0.2,
+        "random_seed": 42,
+        "stratification_columns": [LOCATION],
+    }
+    split = partition_scans(load_private_scans(sources), **options)
     scaler, model, feature_columns = fit_bundle(split, estimator_seed)
-    revision = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
     source_root = Path(__file__).resolve().parent
+    revision = subprocess.check_output(
+        ["git", "-C", str(source_root), "rev-parse", "HEAD"], text=True
+    ).strip()
     source_files = (
         "fit_wavelet_random_forest.py",
         "wavelet_rf_features.py",
@@ -104,6 +105,7 @@ def main():
         "estimator": "sklearn.ensemble.RandomForestRegressor",
         "estimator_parameters": model.get_params(),
         "release_numpy_seed": estimator_seed,
+        "split_strategy": options,
         "code_revision": revision,
         "source_sha256": {
             name: hashlib.sha256((source_root / name).read_bytes()).hexdigest()

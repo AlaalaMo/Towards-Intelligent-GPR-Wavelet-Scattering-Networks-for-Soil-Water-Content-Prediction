@@ -131,13 +131,15 @@ Evaluation writes `eval/predictions.csv` with the original input columns followe
 
 ### Private fit and cluster validation
 
-The fitting command requires a private JSON run record. Its `sources` array provides `path` (relative to the record or absolute) and `original_location` for each CSV, in original input order. Its `split` object provides `location`, `split_function`, `test_size`, `random_seed`, `stratification_columns` as ordered two-element column labels, and `expected_train_ids` and `expected_test_ids` in recorded order. Map source rows to IDs of the form `original_location#zero_based_data_row` before recording the expected IDs. The top-level `estimator_seed` sets NumPy's seed for this fixed-parameter refit. The historical random forest used the estimator default `random_state=None` and its final RNG state depends on the preceding research run.
+By default, fitting reads the CSVs under `Final_data/freq_mean_sweep/unprocessed` and follows the research launcher's split settings. It keeps rows with `avgdepth3 <= 48` from all locations, then uses the research location-stratified 80/20 splitter with seed 42. It separately seeds NumPy with 42 for the fixed-parameter forest refit.
 
 ```bash
-python fit_wavelet_random_forest.py --private-run /path/to/private-run.json
-sbatch scripts/fit_wavelet_random_forest.sh /path/to/private-run.json
+python fit_wavelet_random_forest.py
+sbatch scripts/fit_wavelet_random_forest.sh
 # Confirm the fitting job succeeded before submitting evaluation.
 sbatch scripts/evaluate_wavelet_random_forest.sh "$PWD/eval/test_dataset.csv"
 ```
 
-The fitting command verifies the ordered partition IDs before exporting the raw held-out rows. The scaler learns feature means and scales from the verified training partition, and the forest fits on those scaled training features. Evaluation and prediction reuse the saved scaler via `transform`. Refit the scaler and forest together if you have a bundle from the earlier pre-split method. The two fitted artifacts and evaluation CSV require release authorization. The held-out set's role in configuration selection is pending provenance verification.
+The scaler learns feature means and scales from the training partition, and the forest fits on those scaled training features. Evaluation and prediction reuse the saved scaler via `transform`. Refit the scaler and forest together if you have a bundle from the earlier pre-split method. The two fitted artifacts and evaluation CSV require release authorization. The held-out set's role in configuration selection is pending provenance verification.
+
+The output manifest records the split settings. Exact agreement with the historical run's ordered row IDs remains unverified.

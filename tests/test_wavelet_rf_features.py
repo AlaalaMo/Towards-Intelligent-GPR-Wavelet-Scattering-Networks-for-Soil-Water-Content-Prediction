@@ -10,13 +10,14 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
+from sklearn.model_selection import train_test_split
 
 from Data_process import height_wavelet_transform, transform_location_wise_height_group
 from evaluate_wavelet_random_forest import PREDICTION_COLUMNS, read_scans
 from fit_wavelet_random_forest import FOREST_PARAMETERS, fit_bundle
 from loading_in_config import get_subset_columns
 from wavelet_rf_features import SCAN_COLUMNS, TARGET_COLUMNS, extract_features
-from wavelet_rf_split import LOCATION, ROW_ID, verified_partitions
+from wavelet_rf_split import LOCATION, ROW_ID, partition_scans
 
 
 def test_config_41_matches_research_fitter_and_is_row_local():
@@ -56,7 +57,7 @@ def test_config_41_rejects_invalid_inputs():
         extract_features(scans)
 
 
-def test_verified_split_and_fitted_bundle_preserve_row_order():
+def test_split_and_fitted_bundle_preserve_row_order():
     rng = np.random.default_rng(42)
     samples = rng.normal(size=(5, len(SCAN_COLUMNS), 2))
     scans = pd.DataFrame(
@@ -74,13 +75,11 @@ def test_verified_split_and_fitted_bundle_preserve_row_order():
         "test_size": 0.5,
         "random_seed": 42,
         "stratification_columns": [],
-        "expected_train_ids": ["a0", "a2"],
-        "expected_test_ids": ["b0", "b1"],
     }
-    with pytest.raises(ValueError, match="held-out row IDs or ordering"):
-        verified_partitions(scans, **{**provenance, "expected_test_ids": ["b1", "b0"]})
-    split = verified_partitions(scans, **provenance)
+    split = partition_scans(scans, **provenance)
     assert split.eligible[ROW_ID].tolist() == ["a0", "a2", "b0", "b1"]
+    assert split.train[ROW_ID].tolist() == ["a0", "a2"]
+    assert split.test[ROW_ID].tolist() == ["b0", "b1"]
     assert list(split.test.columns) == list(scans.columns[:-1])
 
     scaler, model, columns = fit_bundle(split, estimator_seed=42)
@@ -105,11 +104,11 @@ def test_verified_split_and_fitted_bundle_preserve_row_order():
 
 def test_release_commands_in_fresh_processes(tmp_path):
     repo = Path(__file__).resolve().parents[1]
-    raw = tmp_path / "raw.csv"
-    record = tmp_path / "private.json"
+    raw = tmp_path / "Final_data" / "freq_mean_sweep" / "unprocessed" / "raw.csv"
+    raw.parent.mkdir(parents=True)
     bundle = tmp_path / "artifacts"
     evaluation = tmp_path / "evaluation"
-    held_out = tmp_path / "held out.csv"
+    held_out = tmp_path / "eval" / "test_dataset.csv"
     unlabeled = tmp_path / "unlabeled.csv"
     estimates = tmp_path / "estimates.csv"
     sample_count = len(SCAN_COLUMNS)
@@ -122,19 +121,6 @@ def test_release_commands_in_fresh_processes(tmp_path):
         for i, scan in enumerate(signals):
             signal = scan[:, 0] + 1j * scan[:, 1]
             writer.writerow([*signal, *(10 + i + depth for depth in range(4))])
-    record.write_text(json.dumps({
-        "estimator_seed": 42,
-        "sources": [{"path": raw.name, "original_location": "fixture"}],
-        "split": {
-            "location": "all",
-            "split_function": "test_train_80_20",
-            "test_size": 0.2,
-            "random_seed": 42,
-            "stratification_columns": [],
-            "expected_train_ids": [f"fixture#{i}" for i in range(8)],
-            "expected_test_ids": ["fixture#8", "fixture#9"],
-        },
-    }), encoding="utf-8")
 
     def run(script, *args, cwd=tmp_path):
         result = subprocess.run(
@@ -143,10 +129,8 @@ def test_release_commands_in_fresh_processes(tmp_path):
         )
         assert result.returncode == 0, result.stderr
 
-    run("fit_wavelet_random_forest.py", "--private-run", record, "--artifact-dir", bundle,
-        "--eval-output", held_out, cwd=repo)
+    run("fit_wavelet_random_forest.py")
     raw.unlink()
-    record.unlink()
     run("evaluate_wavelet_random_forest.py", "--artifact-dir", bundle,
         "--eval-dataset", held_out, "--output-dir", evaluation)
     scans, dataset_hash = read_scans(held_out)
@@ -163,12 +147,16 @@ def test_release_commands_in_fresh_processes(tmp_path):
     assert [row[:-4] for row in prediction_rows] == csv_rows(held_out)
     assert prediction_rows[0][-4:] == PREDICTION_COLUMNS
     assert estimate_rows[0] == ["row_id", *PREDICTION_COLUMNS]
-    assert [row[0] for row in estimate_rows[1:]] == ["fixture#8", "fixture#9"]
+    _, expected_test = train_test_split(
+        list(range(10)), test_size=0.2, random_state=42, stratify=["fixture"] * 10
+    )
+    assert [int(row[0].rsplit("#", 1)[1]) for row in estimate_rows[1:]] == expected_test
     assert [row[-4:] for row in prediction_rows[2:]] == [row[1:] for row in estimate_rows[1:]]
     metrics = json.loads((evaluation / "metrics.json").read_text(encoding="utf-8"))
     manifest = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))
     assert metrics["run_id"] == manifest["run_id"]
     assert manifest["standard_scaler_fit_scope"] == "training_rows_only"
+    assert manifest["split_strategy"]["split_function"] == "stratified_train_test_split_80_20"
     scaler = pickle.loads((bundle / "standard_scaler.pkl").read_bytes())
     assert scaler.n_samples_seen_ == 8
     assert metrics["evaluation_dataset_sha256"] == dataset_hash
