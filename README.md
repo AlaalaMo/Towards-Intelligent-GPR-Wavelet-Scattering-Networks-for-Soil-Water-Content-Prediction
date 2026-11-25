@@ -6,6 +6,12 @@ Filardi, V., Khosravi Largani, N., Zekavat, S. R., Moradikia, M., Wilson, B., As
 
 [Read the paper on IEEE Xplore](https://ieeexplore.ieee.org/abstract/document/11512972/).
 
+## Project overview
+
+This repository includes an end-to-end pipeline for estimating soil water content (SWC) at **10, 20, 30, and 40 cm** from new stepped-frequency continuous-wave (SFCW) ground-penetrating radar (GPR) scans. The model expects **4,096 complex frequency samples per scan**, measured across **0.4–2.0 GHz** and supplied in the original sweep order.
+
+The pipeline extracts wavelet scattering features from each scan and uses a fitted random forest to estimate SWC at each depth. See [Evaluation and prediction](#evaluation-and-prediction) for the commands.
+
 ## Abstract
 
 This work investigates the development of intelligent Ground Penetrating Radar (GPR) for mapping the received GPR signal features into soil water content (SWC) across multiple depths. To address this, this paper introduces a flexible feature-extraction and machine learning (ML) framework for estimating subsurface SWC at multiple depths from GPR measurements. Specifically, the paper assesses the role of Wavelet Scattering Networks (WSN) data preprocessing for high performance SWC prediction. The proposed methods’ performance is evaluated on in-situ field measurements conducted via an off-the-shelf GPR that transmits multi-carrier signals over 4096 frequency components within the 400 MHz—2 GHz frequency range. The measurements were conducted in the Soilx Lab fields at Worcester Polytechnic Institute (WPI) and are based on loamy soil texture material that is consistent with the topsoil composition of many local farms. Using this data, the performance of different supervised learning models is evaluated, including transformers, deep convolutional neural networks, recurrent neural networks, random forest, linear regression, and LASSO, with diverse signal features extracted from 4096 frequency components. To properly train the ML models, the received GPR signals were labeled via a high-performance moisture probe capable of measuring SWC at different depths. The WSN was deployed as a pre-processing step to extract higher-order derivatives of the attenuation curve, i.e., the received signal power vs. frequency components, enabling high-performance moisture per depth estimation via downstream ML models. We assess the WSN’s performance in predicting multiple root zone SWC by adjusting the filter count and maximum scale of the transform. Additionally, this work determines the most important and optimal number of carrier frequencies required to maintain high prediction accuracy for SWC, aiming to minimize power consumption and the GPR operation speed for scanning all frequency components. Compared to the best-performing benchmark ML model, the proposed WSN feature extraction, paired with a downstream random forest model, achieved 41% higher accuracy with as low as 2.79 SWC RMSE in SWC prediction over four root zone depths. The paper marks an excellent progress toward the implementation of intelligent GPR for megafarm soil subsurface moisture characterization.
@@ -116,7 +122,9 @@ Each script calls [initial_DL_fit.py](Deep%20learning/initial_DL_fit.py) with it
 
 ![Results table comparing soil water content prediction performance](docs/images/results.JPG)
 
-## Config 41 wavelet-scattering random forest release
+## Evaluation and prediction
+
+These commands use the wavelet scattering and random forest settings selected in the paper. Evaluation scores the fitted model on labeled held-out scans. Prediction estimates SWC from new unlabeled scans.
 
 Use the dependencies in [environment.yml](environment.yml) and run these commands from the repository root. Use a trusted release bundle containing `manifest.json`, `standard_scaler.pkl`, and `random_forest.pkl`. Pickle loading executes code from the bundle.
 
@@ -125,9 +133,9 @@ python evaluate_wavelet_random_forest.py --artifact-dir artifacts --eval-dataset
 python predict_wavelet_random_forest.py --artifact-dir artifacts --scans scans.csv --output estimates.csv
 ```
 
-Both commands accept raw `freq_mean_sweep` inputs after the research loader's height naming. The CSV has two header rows and a unique `(meta, row_id)` column. Supply the original ordered complex `height_2` columns from `freq_mean_sweep_0.1` through `freq_mean_sweep_4095.1`. For evaluation include `(y, avgdepth1)` through `(y, avgdepth4)`, corresponding to 10, 20, 30, and 40 cm. Prediction accepts unlabeled scans and writes one row per ID with the four depth estimates.
+Both commands accept raw `freq_mean_sweep` inputs after the research loader's height naming. Each scan must contain the 4,096 complex samples of a 0.4–2.0 GHz SFCW sweep in frequency order. The CSV has two header rows and a unique `(meta, row_id)` column. Supply the samples as the ordered `height_2` columns from `freq_mean_sweep_0.1` through `freq_mean_sweep_4095.1`. For evaluation include `(y, avgdepth1)` through `(y, avgdepth4)`, corresponding to 10, 20, 30, and 40 cm. Prediction accepts unlabeled scans and writes one row per ID with the four depth estimates.
 
-Evaluation writes `eval/predictions.csv` with the original input columns followed by the four depth estimates, and `eval/metrics.json` with pooled RMSE, MAPE, MAE, the row count, run ID, and SHA-256 of the evaluated CSV. MAPE is the mean of `100 * abs((observed - predicted) / observed)` over all row-depth pairs. Evaluation rejects zero targets because the research formula divides by the observed value.
+Evaluation writes the four depth estimates to `eval/predictions.csv` and pooled RMSE, percent MAPE, and MAE to `eval/metrics.json`. MAPE requires nonzero observed SWC values.
 
 ### Private fit and cluster validation
 
@@ -140,6 +148,6 @@ sbatch scripts/fit_wavelet_random_forest.sh
 sbatch scripts/evaluate_wavelet_random_forest.sh "$PWD/eval/test_dataset.csv"
 ```
 
-The scaler learns feature means and scales from the training partition, and the forest fits on those scaled training features. Evaluation and prediction reuse the saved scaler via `transform`. Refit the scaler and forest together if you have a bundle from the earlier pre-split method. The two fitted artifacts and evaluation CSV require release authorization. The held-out set's role in configuration selection is pending provenance verification.
+The release bundle and evaluation CSV require release authorization.
 
 The output manifest records the split settings. Exact agreement with the historical run's ordered row IDs remains unverified.
