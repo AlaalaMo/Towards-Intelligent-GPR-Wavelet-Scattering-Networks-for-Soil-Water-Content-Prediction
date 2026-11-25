@@ -7,6 +7,8 @@
 # Ignore data files
 /link_data/
 /Final_data/
+/artifacts/
+/eval/
 
 # Ignore SLURM scripts directory
 /sh_files/

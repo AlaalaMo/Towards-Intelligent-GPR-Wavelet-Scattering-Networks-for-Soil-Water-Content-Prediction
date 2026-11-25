@@ -115,3 +115,29 @@ Each script calls [initial_DL_fit.py](Deep%20learning/initial_DL_fit.py) with it
 ## Results
 
 ![Results table comparing soil water content prediction performance](docs/images/results.JPG)
+
+## Config 41 wavelet-scattering random forest release
+
+Use the dependencies in [environment.yml](environment.yml) and run these commands from the repository root. Use a trusted release bundle containing `manifest.json`, `standard_scaler.pkl`, and `random_forest.pkl`. Pickle loading executes code from the bundle.
+
+```bash
+python evaluate_wavelet_random_forest.py --artifact-dir artifacts --eval-dataset eval/test_dataset.csv
+python predict_wavelet_random_forest.py --artifact-dir artifacts --scans scans.csv --output estimates.csv
+```
+
+Both commands accept raw `freq_mean_sweep` inputs after the research loader's height naming. The CSV has two header rows and a unique `(meta, row_id)` column. Supply the original ordered complex `height_2` columns from `freq_mean_sweep_0.1` through `freq_mean_sweep_4095.1`. For evaluation include `(y, avgdepth1)` through `(y, avgdepth4)`, corresponding to 10, 20, 30, and 40 cm. Prediction accepts unlabeled scans and writes one row per ID with the four depth estimates.
+
+Evaluation writes `eval/predictions.csv` with the original input columns followed by the four depth estimates, and `eval/metrics.json` with pooled RMSE, MAPE, MAE, the row count, run ID, and SHA-256 of the evaluated CSV. MAPE is the mean of `100 * abs((observed - predicted) / observed)` over all row-depth pairs. Evaluation rejects zero targets because the research formula divides by the observed value.
+
+### Private fit and cluster validation
+
+The fitting command requires a private JSON run record. Its `sources` array provides `path` (relative to the record or absolute) and `original_location` for each CSV, in original input order. Its `split` object provides `location`, `split_function`, `test_size`, `random_seed`, `stratification_columns` as ordered two-element column labels, and `expected_train_ids` and `expected_test_ids` in recorded order. Map source rows to IDs of the form `original_location#zero_based_data_row` before recording the expected IDs. The top-level `estimator_seed` sets NumPy's seed for this fixed-parameter refit. The historical random forest used the estimator default `random_state=None` and its final RNG state depends on the preceding research run.
+
+```bash
+python fit_wavelet_random_forest.py --private-run /path/to/private-run.json
+sbatch scripts/fit_wavelet_random_forest.sh /path/to/private-run.json
+# Confirm the fitting job succeeded before submitting evaluation.
+sbatch scripts/evaluate_wavelet_random_forest.sh "$PWD/eval/test_dataset.csv"
+```
+
+The fitting command verifies the ordered partition IDs before exporting the raw held-out rows. The fitted scaler uses all eligible feature rows, including held-out inputs, as directed for this release. The forest uses only the verified training partition. The two fitted artifacts and evaluation CSV require release authorization. The held-out set's role in configuration selection is pending provenance verification.

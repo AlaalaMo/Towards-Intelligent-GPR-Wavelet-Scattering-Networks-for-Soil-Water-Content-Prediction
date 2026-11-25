@@ -1,0 +1,44 @@
+# Config 41 release workflow progress
+
+## Milestones and validation
+
+1. Reconstruct the research split from run evidence. Match ordered training and held-out IDs privately, then check the two-row CSV header, complex values, labels, metadata and row order on export.
+2. Implement the shared config 41 feature pipeline. Compare its ordered arrays with the research pipeline on the same representative scans and verify single-row and batch agreement.
+3. Fit the fixed-parameter model, serialize the fitted scaler and estimator, and record the input and output schema, dependency versions, code revision and run identity. Compare predictions before and after serialization.
+4. Add the public evaluate and predict commands and README quickstart. Verify alignment, pooled metrics, malformed-input errors and fresh-process inference on a synthetic fixture.
+5. Add HPC Bash wrappers and complete local validation before the manually submitted fitting and evaluation jobs. Verify job logs, output artifacts, dataset and run identity in the metrics, and permissions for release.
+
+Re-read `goals/wavelet_random_forest_plan.json` and apply the user's latest instructions before each milestone.
+
+## Milestone 1 in progress
+
+- Confirmed that the repository generates config 41 with the planned domain, output location and wavelet transform. Research preprocessing groups rows by the location key in sorted order and retains input order within each location. The fitting path then applies `avgdepth3 <= 48`, optionally filters the location with a regex, and selects metadata whose second-level label starts with `location`.
+- Confirmed that the current fitting code constructs the scikit-learn estimator with its default constructor and seeds NumPy separately. The estimator's default `random_state` is `None`. The default CLI seed is 42. The original run's seed and RNG state at the final refit still need evidence.
+- Inspected the three local raw CSV headers. Each carries three blocks of 4,096 scan samples and labels `avgdepth1` through `avgdepth4`. The raw `prefix` and `Hour` pair repeats in each file, so it is insufficient for unique row identity. The source file and a stable source-row identity must be reconciled with the original split record.
+- Added `wavelet_rf_split.py` for original CSV loading, research location ordering, eligibility filtering, split replay and exact ordered ID checks. Its raw CSV export stages the file and verifies the two header levels, row IDs and complex values before replacing the destination. Loaded all three local raw sources and confirmed that source-row IDs are unique and their height-2 headers match the ordered schema. Matching the derived IDs to the original split is still pending.
+- The current checkout lacks the config 41 transformed dataset and a matching job or split record. Historical result CSVs checked so far did not contain the supplied `ccp_alpha`. The user confirmed the config 41 transforms and forest parameters. The split arguments, ordered IDs, original refit RNG state and the held-out set's role in model selection remain open. The original data and its fitted artifacts require release authorization.
+- Located a candidate launcher in `Turing_aboose/smooth_sk_sbatch.sh`. It uses the dated 2025-10-24 config list, whose index 41 matches the plan, and requests height 2, all locations, `stratified_train_test_split_80_20`, and seed 42. The splitter defaults to 20% test rows and the current fitting loader selects location metadata. A read-only candidate replay yielded 91 eligible rows, with 72 training and 19 held-out. The candidate test labels are nonzero and present at all four depths. The generator schedules both PCA variants and the launcher is insufficient to identify the original result or prove ordered membership. The candidate IDs were kept in memory during the check.
+- Ran the shared extractor on all 91 local rows eligible under the candidate launcher. It produced 69,376 finite features per row. No partition files or fitted artifacts were written.
+
+## Release implementation and local checks
+
+- Added `wavelet_rf_features.py` and `tests/test_wavelet_rf_features.py`. The extractor calls the original scattering function and reproduces the real and imaginary feature interleaving in the research fitter, including the zero imaginary component of each real scattering coefficient. Two synthetic tests passed with the AKELA interpreter. They cover research feature ordering, single-row versus batch parity, and rejection of incomplete, reordered, constant or nonfinite scans.
+- Compared ordered features from two representative local scans with `height_wavelet_transform` followed by the research loader's `get_subset_columns`. Both arrays matched with relative tolerance `1e-12` and absolute tolerance `1e-14`. No raw values or private row IDs were exported by this check.
+- Added `fit_wavelet_random_forest.py`. It takes a private record with explicit source labels, splitter settings, ordered IDs and release seed. The scaler fits on the full eligible matrix in research row order before indexing the training rows. The release refit seeds NumPy directly before the fixed-parameter fit. This creates a reproducible refit and does not reproduce global RNG consumption by the original search.
+- Added `evaluate_wavelet_random_forest.py` and `predict_wavelet_random_forest.py`. Both validate and apply the shared feature schema and the fitted scaler. Evaluation preserves original cells and depth order and identifies the bundle run and input by hash. Its percent MAPE rejects zero and nonfinite labels.
+- Added the README quickstart, default artifact and evaluation ignores, and the two Bash wrappers for manual SLURM submission. A synthetic CLI run passed from raw research-format CSV through verified split, fit, fresh-process evaluation and prediction. The private fixture was removed before inference. The check compared all original output cells and row IDs, the four depth estimates and the three pooled metrics.
+
+## Methodology decision
+
+The user directed that the release run fit the StandardScaler before splitting, as the research workflow does. This supersedes the training-only fit in version 7. The scaler will therefore see all eligible rows selected for the run, including held-out inputs. The estimator will be fit on the training partition. Release documentation and metrics provenance should identify this preprocessing method. A future training-only fit and model retraining would be a separate run.
+
+## Baseline checks
+
+- `python -m py_compile wavelet_rf_split.py` passed with the local AKELA interpreter. A synthetic check verified location grouping order, eligibility at the cutoff, height selection, rejection of misordered IDs and complex CSV round-trip.
+- Ran the existing suite with the local AKELA interpreter. It reported 24 passed and 3 failed. Two tests could not write temporary files under the Windows sandbox. The row-dispatch test failed with `KeyError: ('meta', 'location')` in this environment. The local AKELA environment uses pandas 3.1.1 and scikit-learn 1.9.1, while `environment.yml` pins pandas 2.2.3 and scikit-learn 1.5.2.
+- After implementation, `python -m pytest tests -q -p no:cacheprovider --tb=short` reported 26 passed and the same 3 baseline failures. The sandbox denied cleanup of three temporary directories created by the initial test and compile attempts.
+- Added a persistent synthetic regression in the existing config 41 test file. It checks rejection of reordered held-out IDs, eligibility and column order, the pre-split scaler fit, fixed forest parameters, and single-row prediction parity after pickle reload. The AKELA syntax check and all three targeted config 41 tests passed.
+- Added `.github/workflows/wavelet-rf.yml` to run the synthetic tests and Python and Bash syntax checks on Linux without private inputs. Validated the YAML structure locally. The hosted workflow has yet to run.
+- Added the fresh-process CLI smoke check to the CI test file. It builds a synthetic research-format CSV, fits the bundle, removes private inputs, evaluates the held-out CSV, and predicts on unlabeled scans. It checks original CSV cells, row and depth order, pooled metric values, and both run and evaluation dataset identity. All four config 41 tests passed locally with an ordinary workspace fixture directory substituted for the sandbox-inaccessible pytest temporary directory. The updated test file passed the AKELA syntax check.
+- `python -m py_compile` passed for all six new Python files using the AKELA interpreter. Git Bash could not start under the Windows sandbox because it could not create a signal pipe. WSL also reported access denied. The Bash syntax gate remains open.
+- No cluster jobs have run. Original split provenance and the approved-data, manual SLURM and release verification gates remain open.

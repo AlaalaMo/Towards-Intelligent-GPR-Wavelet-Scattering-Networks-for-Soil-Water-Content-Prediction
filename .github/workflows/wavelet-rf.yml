@@ -1,0 +1,28 @@
+name: Config 41 release checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+      - name: Install release test dependencies
+        run: >-
+          python -m pip install numpy==2.0.2 pandas==2.2.3 scipy==1.13.1
+          scikit-learn==1.5.2 kymatio==0.3.0 pytest==8.3.5
+      - name: Check Python and Bash syntax
+        run: |
+          python -m py_compile wavelet_rf_features.py wavelet_rf_split.py fit_wavelet_random_forest.py evaluate_wavelet_random_forest.py predict_wavelet_random_forest.py tests/test_wavelet_rf_features.py
+          bash -n scripts/fit_wavelet_random_forest.sh
+          bash -n scripts/evaluate_wavelet_random_forest.sh
+      - name: Run synthetic config 41 tests
+        run: python -m pytest -q tests/test_wavelet_rf_features.py
