@@ -8,7 +8,8 @@
 /link_data/
 /Final_data/
 /artifacts/
-/eval/
+/eval/*
+!/eval/test_dataset.csv
 
 # Ignore SLURM scripts directory
 /sh_files/

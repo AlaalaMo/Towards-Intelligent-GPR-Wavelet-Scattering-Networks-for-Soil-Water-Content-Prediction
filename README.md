@@ -10,7 +10,7 @@ Filardi, V., Khosravi Largani, N., Zekavat, S. R., Moradikia, M., Wilson, B., As
 
 This repository includes an end-to-end pipeline for estimating soil water content (SWC) at **10, 20, 30, and 40 cm** from new stepped-frequency continuous-wave (SFCW) ground-penetrating radar (GPR) scans. The model expects **4,096 complex frequency samples per scan**, measured across **0.4–2.0 GHz** and supplied in the original sweep order.
 
-The pipeline extracts wavelet scattering features from each scan and uses a fitted random forest to estimate SWC at each depth. See [Evaluation and prediction](#evaluation-and-prediction) for the commands.
+You can run the pipeline with the paper's best-performing combination of wavelet scattering features and a fitted random forest. Use it to evaluate labeled SFCW GPR datasets or estimate SWC from new unlabeled scans. See [Evaluation and prediction](#evaluation-and-prediction) for the commands.
 
 ## Abstract
 
@@ -124,7 +124,7 @@ Each script calls [initial_DL_fit.py](Deep%20learning/initial_DL_fit.py) with it
 
 ## Evaluation and prediction
 
-These commands use the wavelet scattering and random forest settings selected in the paper. Evaluation scores the fitted model on labeled held-out scans. Prediction estimates SWC from new unlabeled scans.
+The full research dataset is unavailable for sharing. A labeled sample is provided at `eval/test_dataset.csv` so you can run the evaluation script.
 
 Use the dependencies in [environment.yml](environment.yml) and run these commands from the repository root. Use a trusted release bundle containing `manifest.json`, `standard_scaler.pkl`, and `random_forest.pkl`. Pickle loading executes code from the bundle.
 
@@ -136,18 +136,3 @@ python predict_wavelet_random_forest.py --artifact-dir artifacts --scans scans.c
 Both commands accept raw `freq_mean_sweep` inputs after the research loader's height naming. Each scan must contain the 4,096 complex samples of a 0.4–2.0 GHz SFCW sweep in frequency order. The CSV has two header rows and a unique `(meta, row_id)` column. Supply the samples as the ordered `height_2` columns from `freq_mean_sweep_0.1` through `freq_mean_sweep_4095.1`. For evaluation include `(y, avgdepth1)` through `(y, avgdepth4)`, corresponding to 10, 20, 30, and 40 cm. Prediction accepts unlabeled scans and writes one row per ID with the four depth estimates.
 
 Evaluation writes the four depth estimates to `eval/predictions.csv` and pooled RMSE, percent MAPE, and MAE to `eval/metrics.json`. MAPE requires nonzero observed SWC values.
-
-### Private fit and cluster validation
-
-By default, fitting reads the CSVs under `Final_data/freq_mean_sweep/unprocessed` and follows the research launcher's split settings. It keeps rows with `avgdepth3 <= 48` from all locations, then uses the research location-stratified 80/20 splitter with seed 42. It separately seeds NumPy with 42 for the fixed-parameter forest refit.
-
-```bash
-python fit_wavelet_random_forest.py
-sbatch scripts/fit_wavelet_random_forest.sh
-# Confirm the fitting job succeeded before submitting evaluation.
-sbatch scripts/evaluate_wavelet_random_forest.sh "$PWD/eval/test_dataset.csv"
-```
-
-The release bundle and evaluation CSV require release authorization.
-
-The output manifest records the split settings. Exact agreement with the historical run's ordered row IDs remains unverified.
